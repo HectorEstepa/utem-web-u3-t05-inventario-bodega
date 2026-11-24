@@ -9,7 +9,7 @@
     "android": {
       "package": "cl.utem.inventariobodega",
       "versionCode": 1,
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": false
     },
     "ios": {
       "bundleIdentifier": "cl.utem.inventariobodega",

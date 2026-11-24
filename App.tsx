@@ -2,12 +2,13 @@ import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react
 import {
   BackHandler,
   Keyboard,
+  Platform,
   Pressable,
+  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite';
@@ -59,7 +60,6 @@ const TABS: ReadonlyArray<{
 function ContenedorPrincipal() {
   const db = useSQLiteContext();
   const { paleta } = useTema();
-  const insets = useSafeAreaInsets();
   const [pestana, setPestana] = useState<Pestana>('inicio');
   const [subvista, setSubvista] = useState<Subvista>({ tipo: 'ninguna' });
   const [fallo, setFallo] = useState<string | null>(null);
@@ -117,18 +117,7 @@ function ContenedorPrincipal() {
   const mostrarTabBar = subvista.tipo === 'ninguna';
 
   return (
-    <View
-      style={[
-        s.raiz,
-        {
-          backgroundColor: paleta.fondo,
-          paddingTop: insets.top,
-          // Si no se muestra la Tab Bar (subpantallas), reservamos el margen
-          // inferior aquí para que nunca choque con los botones de navegación.
-          paddingBottom: mostrarTabBar ? 0 : insets.bottom,
-        },
-      ]}
-    >
+    <SafeAreaView style={[s.raiz, { backgroundColor: paleta.fondo }]}>
       <StatusBar style={paleta.oscura ? 'light' : 'dark'} />
 
       <View style={s.contenido}>
@@ -191,9 +180,6 @@ function ContenedorPrincipal() {
             {
               backgroundColor: paleta.barraTab,
               borderTopColor: paleta.separador,
-              // Respeta la barra de 3 botones o gestos de Android (edge-to-edge)
-              // y el indicador Home de iPhone sin superposición.
-              paddingBottom: Math.max(insets.bottom, 8),
             },
           ]}
         >
@@ -220,21 +206,19 @@ function ContenedorPrincipal() {
           })}
         </View>
       ) : null}
-    </View>
+    </SafeAreaView>
   );
 }
 
 export default function Raiz() {
   return (
-    <SafeAreaProvider>
-      <ProveedorTema>
-        <Suspense fallback={<Cargando texto="Inicializando motor SQLite…" />}>
-          <SQLiteProvider databaseName="bodega.db" onInit={migrar} useSuspense>
-            <ContenedorPrincipal />
-          </SQLiteProvider>
-        </Suspense>
-      </ProveedorTema>
-    </SafeAreaProvider>
+    <ProveedorTema>
+      <Suspense fallback={<Cargando texto="Inicializando motor SQLite…" />}>
+        <SQLiteProvider databaseName="bodega.db" onInit={migrar} useSuspense>
+          <ContenedorPrincipal />
+        </SQLiteProvider>
+      </Suspense>
+    </ProveedorTema>
   );
 }
 
@@ -245,6 +229,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 4 : 10,
   },
   tabItem: {
     flex: 1,
