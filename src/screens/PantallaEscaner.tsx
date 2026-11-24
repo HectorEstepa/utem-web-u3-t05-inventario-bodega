@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Linking, Pressable, StyleSheet, Text, Vibration, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { Boton } from '../components/Boton';
 import { Cargando } from '../components/Estados';
@@ -48,6 +49,7 @@ export function PantallaEscaner({ onLeido, onCancelar, onManual }: Props) {
 
       const r = procesarLectura(data);
       if (r.ok) {
+        Vibration.vibrate(35);
         onLeido(r.codigo);
         return;
       }
@@ -177,19 +179,29 @@ export function PantallaEscaner({ onLeido, onCancelar, onManual }: Props) {
           onPress={onCancelar}
           accessibilityRole="button"
           accessibilityLabel="Cerrar escáner"
-          style={s.pildoraOscura}
+          style={[s.pildoraOscura, { flexDirection: 'row', gap: 4 }]}
         >
-          <Text style={s.txtOverlay}>‹ Volver</Text>
+          <Ionicons name="chevron-back" size={18} color="#FFFFFF" />
+          <Text style={s.txtOverlay}>Volver</Text>
         </Pressable>
 
         <Pressable
           onPress={() => setLinterna((v) => !v)}
           accessibilityRole="button"
           accessibilityLabel={linterna ? 'Apagar linterna' : 'Encender linterna'}
-          style={[s.pildoraOscura, linterna && { backgroundColor: '#F59E0B' }]}
+          style={[
+            s.pildoraOscura,
+            { flexDirection: 'row', gap: 6 },
+            linterna && { backgroundColor: '#F59E0B' },
+          ]}
         >
+          <Ionicons
+            name={linterna ? 'flashlight' : 'flashlight-outline'}
+            size={16}
+            color={linterna ? '#111114' : '#FFFFFF'}
+          />
           <Text style={[s.txtOverlay, linterna && { color: '#111114' }]}>
-            {linterna ? '☀ Luz ON' : '☀ Linterna'}
+            {linterna ? 'Luz ON' : 'Linterna'}
           </Text>
         </Pressable>
       </View>
@@ -207,7 +219,7 @@ export function PantallaEscaner({ onLeido, onCancelar, onManual }: Props) {
 
       {/* Panel inferior flotante */}
       <View style={s.pie}>
-        <Boton titulo="⌨ Ingresar código manualmente" onPress={onManual} />
+        <Boton titulo="Ingresar código manualmente" onPress={onManual} />
       </View>
     </View>
   );

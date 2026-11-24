@@ -102,9 +102,9 @@ export function PantallaDashboard({
       {/* Cabecera ejecutiva */}
       <View style={s.filaCabecera}>
         <View style={{ flex: 1 }}>
-          <Text style={[s.granTitulo, { color: paleta.texto }]}>Resumen</Text>
+          <Text style={[s.granTitulo, { color: paleta.texto }]}>Dashboard</Text>
           <Text style={[s.subtitulo, { color: paleta.textoSecundario }]}>
-            Control financiero y operativo offline
+            Analítica financiera y control de stock
           </Text>
         </View>
         <Pressable
@@ -118,7 +118,7 @@ export function PantallaDashboard({
             (pressed || exportando) && { opacity: 0.72 },
           ]}
         >
-          <Text style={s.txtExcel}>{exportando ? 'Generando…' : '⤓ Exportar .xlsx'}</Text>
+          <Text style={s.txtExcel}>{exportando ? 'Generando…' : 'Exportar .xlsx'}</Text>
         </Pressable>
       </View>
 

@@ -1,20 +1,30 @@
 import React, { useState } from 'react';
-import { Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import {
+  Alert,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 import { useCameraPermissions } from 'expo-camera';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Boton } from '../components/Boton';
 import { SelectorSegmentado } from '../components/SelectorSegmentado';
-import { sembrarCatalogoDemo } from '../db/inventario';
+import { sembrarCatalogoDemo, vaciarBodega } from '../db/inventario';
 import { VERSION_ESQUEMA } from '../db/schema';
 import { exportarReporteExcel } from '../lib/exportarExcel';
 import { useTema, VERSION_APP, type PreferenciaTema } from '../theme';
 
 /**
- * Apartado de Configuración, Accesibilidad y Información Técnica estilo Ajustes de iOS:
+ * Apartado de Configuración, Accesibilidad e Información Técnica:
  * - Apariencia (Automático del sistema · Claro · Oscuro).
  * - Accesibilidad (Modo Alto Contraste + soporte Dynamic Type).
  * - Permisos del sistema (estado en vivo de cámara + acceso directo a Ajustes).
- * - Herramientas de datos (Exportar Excel .xlsx · Cargar catálogo demo · Diagnóstico M1–M3).
+ * - Herramientas de datos (Exportar Excel .xlsx · Catálogo demo · Vaciar bodega · M1–M3).
  * - Ficha técnica verificable (Versión, SDK, SQLite WAL, privacidad Ley 21.719).
  */
 export function PantallaAjustes({
@@ -37,7 +47,7 @@ export function PantallaAjustes({
     setMensaje(null);
     try {
       const archivo = await exportarReporteExcel(db);
-      setMensaje(`Archivo exportado: ${archivo}`);
+      setMensaje(`Reporte gerencial exportado: ${archivo}`);
     } catch (e) {
       setMensaje(e instanceof Error ? e.message : 'Error al exportar Excel.');
     } finally {
@@ -50,12 +60,37 @@ export function PantallaAjustes({
     setOcupado(true);
     try {
       await sembrarCatalogoDemo(db);
-      setMensaje('Catálogo de demostración cargado (5 SKUs con entradas, salidas y precios CLP).');
+      setMensaje('Catálogo demostrativo cargado (5 SKUs reales con precios CLP y movimientos).');
     } catch (e) {
       setMensaje(e instanceof Error ? e.message : 'No se pudo cargar el lote de prueba.');
     } finally {
       setOcupado(false);
     }
+  };
+
+  const confirmarVaciar = () => {
+    Alert.alert(
+      'Vaciar toda la bodega',
+      'Se eliminarán todos los productos y su historial de entradas y salidas de este teléfono. Esta acción no se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sí, vaciar todo',
+          style: 'destructive',
+          onPress: async () => {
+            setOcupado(true);
+            try {
+              await vaciarBodega(db);
+              setMensaje('Bodega vaciada por completo. Lista para empezar desde cero.');
+            } catch (e) {
+              setMensaje(e instanceof Error ? e.message : 'No se pudo vaciar la bodega.');
+            } finally {
+              setOcupado(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const estadoCamara = !permiso
@@ -234,7 +269,7 @@ export function PantallaAjustes({
             pressed && { opacity: 0.65 },
           ]}
         >
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={[s.filaTitulo, { color: paleta.texto }]}>
               Diagnóstico y benchmark (M1 · M2 · M3)
             </Text>
@@ -244,6 +279,24 @@ export function PantallaAjustes({
             </Text>
           </View>
           <Text style={[s.chevron, { color: paleta.textoTerciario }]}>›</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={confirmarVaciar}
+          disabled={ocupado}
+          style={({ pressed }) => [
+            s.filaAccion,
+            { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: paleta.separador },
+            pressed && { opacity: 0.65 },
+          ]}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={[s.filaTitulo, { color: paleta.rojo }]}>Vaciar toda la bodega</Text>
+            <Text style={[s.filaSub, { color: paleta.textoSecundario }]}>
+              Elimina todos los productos y movimientos locales (requiere confirmación)
+            </Text>
+          </View>
+          <Text style={[s.chevron, { color: paleta.rojo }]}>›</Text>
         </Pressable>
       </View>
 

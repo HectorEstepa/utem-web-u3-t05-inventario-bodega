@@ -10,11 +10,13 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite';
 import { migrar } from './src/db/schema';
 import { buscarPorCodigo, type Producto } from './src/db/inventario';
 import { Cargando, ErrorEstado } from './src/components/Estados';
+import { PantallaInicio } from './src/screens/PantallaInicio';
 import { PantallaDashboard } from './src/screens/PantallaDashboard';
 import { PantallaLista } from './src/screens/PantallaLista';
 import { PantallaEscaner } from './src/screens/PantallaEscaner';
@@ -27,13 +29,8 @@ import { ProveedorTema, TOQUE_MINIMO, useTema } from './src/theme';
 
 const T_INICIO_MODULO = performance.now();
 
-type Pestana = 'resumen' | 'inventario' | 'escaner' | 'ajustes';
+type Pestana = 'inicio' | 'inventario' | 'escaner' | 'dashboard' | 'ajustes';
 
-/**
- * Navegación tipada por unión discriminada:
- * - Cuatro pestañas principales estilo Apple HIG Tab Bar (Resumen · Inventario · Escanear · Ajustes).
- * - Cuatro subvistas modales con retorno garantizado a la pestaña previa.
- */
 type Subvista =
   | { tipo: 'ninguna' }
   | { tipo: 'manual' }
@@ -41,17 +38,30 @@ type Subvista =
   | { tipo: 'alta'; codigo: string }
   | { tipo: 'medicion' };
 
-const TABS: ReadonlyArray<{ id: Pestana; etiqueta: string; icono: string }> = [
-  { id: 'resumen', etiqueta: 'Resumen', icono: '▤' },
-  { id: 'inventario', etiqueta: 'Inventario', icono: '▦' },
-  { id: 'escaner', etiqueta: 'Escanear', icono: '⌗' },
-  { id: 'ajustes', etiqueta: 'Ajustes', icono: '⚙' },
+type NombreIcono = React.ComponentProps<typeof Ionicons>['name'];
+
+const TABS: ReadonlyArray<{
+  id: Pestana;
+  etiqueta: string;
+  icono: NombreIcono;
+  iconoActivo: NombreIcono;
+}> = [
+  { id: 'inicio', etiqueta: 'Inicio', icono: 'home-outline', iconoActivo: 'home' },
+  { id: 'inventario', etiqueta: 'Inventario', icono: 'cube-outline', iconoActivo: 'cube' },
+  { id: 'escaner', etiqueta: 'Escanear', icono: 'barcode-outline', iconoActivo: 'barcode' },
+  {
+    id: 'dashboard',
+    etiqueta: 'Dashboard',
+    icono: 'bar-chart-outline',
+    iconoActivo: 'bar-chart',
+  },
+  { id: 'ajustes', etiqueta: 'Ajustes', icono: 'options-outline', iconoActivo: 'options' },
 ];
 
 function ContenedorPrincipal() {
   const db = useSQLiteContext();
   const { paleta } = useTema();
-  const [pestana, setPestana] = useState<Pestana>('resumen');
+  const [pestana, setPestana] = useState<Pestana>('inicio');
   const [subvista, setSubvista] = useState<Subvista>({ tipo: 'ninguna' });
   const [fallo, setFallo] = useState<string | null>(null);
   const [arranqueMs, setArranqueMs] = useState<number | null>(null);
@@ -76,8 +86,8 @@ function ContenedorPrincipal() {
         cerrarSubvista();
         return true;
       }
-      if (pestana !== 'resumen') {
-        setPestana('resumen');
+      if (pestana !== 'inicio') {
+        setPestana('inicio');
         return true;
       }
       return false;
@@ -134,10 +144,13 @@ function ContenedorPrincipal() {
             arranqueMs={arranqueMs}
             muestrasM2={muestrasM2}
           />
-        ) : pestana === 'resumen' ? (
-          <PantallaDashboard
-            onAbrirCodigo={(codigo) => setSubvista({ tipo: 'producto', codigo })}
-            onIrAEscanear={() => setPestana('escaner')}
+        ) : pestana === 'inicio' ? (
+          <PantallaInicio
+            onEscanear={() => setPestana('escaner')}
+            onManual={() => setSubvista({ tipo: 'manual' })}
+            onIrDashboard={() => setPestana('dashboard')}
+            onIrInventario={() => setPestana('inventario')}
+            onAbrirProducto={(p) => setSubvista({ tipo: 'producto', codigo: p.codigo })}
           />
         ) : pestana === 'inventario' ? (
           <PantallaLista
@@ -148,11 +161,16 @@ function ContenedorPrincipal() {
         ) : pestana === 'escaner' ? (
           <PantallaEscaner
             onLeido={resolverCodigo}
-            onCancelar={() => setPestana('inventario')}
+            onCancelar={() => setPestana('inicio')}
             onManual={() => {
               setPestana('inventario');
               setSubvista({ tipo: 'manual' });
             }}
+          />
+        ) : pestana === 'dashboard' ? (
+          <PantallaDashboard
+            onAbrirCodigo={(codigo) => setSubvista({ tipo: 'producto', codigo })}
+            onIrAEscanear={() => setPestana('escaner')}
           />
         ) : (
           <PantallaAjustes
@@ -174,6 +192,7 @@ function ContenedorPrincipal() {
         >
           {TABS.map((t) => {
             const activa = pestana === t.id;
+            const color = activa ? paleta.acento : paleta.textoTerciario;
             return (
               <Pressable
                 key={t.id}
@@ -185,21 +204,8 @@ function ContenedorPrincipal() {
                 accessibilityState={{ selected: activa }}
                 style={({ pressed }) => [s.tabItem, pressed && { opacity: 0.7 }]}
               >
-                <Text
-                  style={[
-                    s.tabIcono,
-                    { color: activa ? paleta.acento : paleta.textoTerciario },
-                  ]}
-                >
-                  {t.icono}
-                </Text>
-                <Text
-                  style={[
-                    s.tabTexto,
-                    { color: activa ? paleta.acento : paleta.textoTerciario },
-                    activa && { fontWeight: '700' },
-                  ]}
-                >
+                <Ionicons name={activa ? t.iconoActivo : t.icono} size={22} color={color} />
+                <Text style={[s.tabTexto, { color }, activa && { fontWeight: '700' }]}>
                   {t.etiqueta}
                 </Text>
               </Pressable>
@@ -237,15 +243,10 @@ const s = StyleSheet.create({
     minHeight: TOQUE_MINIMO,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-  },
-  tabIcono: {
-    fontSize: 20,
-    lineHeight: 22,
-    fontWeight: '700',
+    gap: 3,
   },
   tabTexto: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '500',
   },
 });

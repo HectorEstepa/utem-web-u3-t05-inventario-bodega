@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -8,6 +9,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  Vibration,
   View,
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -17,6 +19,7 @@ import { Cargando, ErrorEstado, Vacio } from '../components/Estados';
 import {
   actualizarProducto,
   buscarPorCodigo,
+  eliminarProducto,
   historial,
   registrarMovimiento,
   type Movimiento,
@@ -98,6 +101,7 @@ export function PantallaProducto({
       setError(null);
       try {
         const final = await registrarMovimiento(db, codigo, tipo, n, nota);
+        Vibration.vibrate(25);
         const montoMov = n * (producto.precio ?? 0);
         setAviso(
           `${tipo === 'IN' ? 'Entrada' : 'Salida'} de ${n} u. (${formatearCLP(
@@ -116,6 +120,31 @@ export function PantallaProducto({
     },
     [producto, cantidad, nota, codigo, db, refrescar]
   );
+
+  const confirmarEliminar = () => {
+    if (!producto || ocupado) return;
+    Alert.alert(
+      'Eliminar producto',
+      `¿Eliminar "${producto.nombre}" (GTIN ${producto.codigo}) y todo su historial de movimientos?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            setOcupado(true);
+            try {
+              await eliminarProducto(db, producto.codigo);
+              onVolver();
+            } catch (e) {
+              setError(e instanceof Error ? e.message : 'No se pudo eliminar el producto.');
+              setOcupado(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const guardarEdicion = async () => {
     if (!producto || ocupado) return;
@@ -295,6 +324,13 @@ export function PantallaProducto({
                   <Boton
                     titulo="Guardar cambios"
                     onPress={guardarEdicion}
+                    deshabilitado={ocupado}
+                    compacto
+                  />
+                  <Boton
+                    titulo="Eliminar artículo de la bodega"
+                    onPress={confirmarEliminar}
+                    estilo="peligro"
                     deshabilitado={ocupado}
                     compacto
                   />

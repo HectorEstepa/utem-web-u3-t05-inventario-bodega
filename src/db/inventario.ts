@@ -162,6 +162,28 @@ export async function actualizarProducto(
   );
 }
 
+export async function eliminarProducto(db: SQLiteDatabase, codigo: string): Promise<void> {
+  // ON DELETE CASCADE elimina automáticamente su historial en `movimientos`.
+  await db.runAsync('DELETE FROM productos WHERE codigo = ?', codigo);
+}
+
+export async function vaciarBodega(db: SQLiteDatabase): Promise<void> {
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    await tx.runAsync('DELETE FROM movimientos');
+    await tx.runAsync('DELETE FROM productos');
+  });
+}
+
+export async function listarCriticos(db: SQLiteDatabase, limite = 6): Promise<Producto[]> {
+  return db.getAllAsync<Producto>(
+    `SELECT * FROM productos
+     WHERE stock <= minimo
+     ORDER BY (stock <= 0) DESC, stock ASC, nombre ASC
+     LIMIT ?`,
+    limite
+  );
+}
+
 /**
  * Registra una entrada (recepción) o salida (despacho/venta) dentro de una
  * transacción exclusiva, congelando el precio unitario vigente del producto.
