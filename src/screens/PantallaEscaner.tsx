@@ -1,20 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Linking, StyleSheet, Text, View } from 'react-native';
+import { AppState, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { Boton } from '../components/Boton';
 import { Cargando } from '../components/Estados';
 import { procesarLectura } from '../lib/gtin';
-import { C } from '../theme';
+import { TOQUE_MINIMO, useTema } from '../theme';
 
 /**
- * Tipos restringidos a los que realmente se usan en un almacén chileno.
- * Aceptar los trece tipos que soporta expo-camera multiplica las lecturas
- * falsas sobre etiquetas de precio y códigos QR de publicidad.
- *
- * code128 queda fuera a propósito: es alfanumérico y de largo libre, así que
- * nunca pasaría la validación del dígito verificador GTIN y el usuario solo
- * vería "lectura incompleta". Soportar etiquetas internas del local exigiría
- * una segunda ruta de validación, y está fuera del alcance.
+ * Simbologías restringidas a códigos comerciales estándar en Chile (GTIN):
+ * evita falsos positivos sobre códigos QR publicitarios o etiquetas internas.
  */
 const TIPOS = ['ean13', 'ean8', 'upc_a'] as const;
 
@@ -25,25 +19,21 @@ type Props = {
 };
 
 export function PantallaEscaner({ onLeido, onCancelar, onManual }: Props) {
+  const { paleta } = useTema();
   const [permiso, pedirPermiso, consultarPermiso] = useCameraPermissions();
   const [explicado, setExplicado] = useState(false);
   const [codigoInvalido, setCodigoInvalido] = useState<string | null>(null);
+  const [linterna, setLinterna] = useState(false);
   const [activa, setActiva] = useState(true);
 
-  // La cámara dispara el callback varias veces por segundo sobre el mismo
-  // código. Sin este candado, un solo escaneo abriría la ficha N veces.
   const bloqueado = useRef(false);
 
   useEffect(() => {
-    // Solo puede haber una vista previa de cámara activa a la vez, y
-    // dejarla encendida en segundo plano consume batería sin dar nada.
-    // Se apaga al salir de primer plano y se limpia al desmontar.
     const sub = AppState.addEventListener('change', (e) => {
-      setActiva(e === 'active');
-      // Al volver de Ajustes el permiso pudo cambiar, y el hook no lo
-      // consulta solo. Sin esto, el usuario que recién lo concedió sigue
-      // viendo la pantalla de "sin acceso" hasta salir y volver a entrar.
-      if (e === 'active') consultarPermiso();
+      const enFrente = e === 'active';
+      setActiva(enFrente);
+      if (!enFrente) setLinterna(false);
+      if (enFrente) consultarPermiso();
     });
     return () => {
       sub.remove();
@@ -71,100 +61,153 @@ export function PantallaEscaner({ onLeido, onCancelar, onManual }: Props) {
     bloqueado.current = false;
   }, []);
 
-  // 1. El permiso todavía se está consultando.
-  if (!permiso) return <Cargando texto="Revisando el permiso de cámara…" />;
+  // 1. Consultando estado inicial del permiso.
+  if (!permiso) return <Cargando texto="Verificando acceso a la cámara…" />;
 
-  // 2. No hay permiso y aún no explicamos por qué lo pedimos.
-  //    La ventana del sistema no permite personalizar su texto, así que la
-  //    explicación va antes, en una pantalla propia.
+  // 2. Explicación contextual propia previa al diálogo nativo del sistema.
   if (!permiso.granted && !explicado) {
     return (
-      <View style={s.centro}>
-        <Text style={s.icono}>📷</Text>
-        <Text style={s.titulo}>Necesitamos la cámara para leer códigos</Text>
-        <Text style={s.parrafo}>
-          La usamos solo mientras tengas esta pantalla abierta, para leer el código de barras del
-          producto. No se guardan ni se envían fotos: la lectura ocurre en tu teléfono y lo único
-          que queda registrado son los números del código.
-        </Text>
-        <Boton
-          titulo="Permitir la cámara"
-          onPress={async () => {
-            setExplicado(true);
-            await pedirPermiso();
-          }}
-        />
-        <Boton titulo="Prefiero escribir el código" onPress={onManual} estilo="secundario" />
-        <Text style={s.volver} onPress={onCancelar}>
-          Volver
-        </Text>
+      <View style={[s.centro, { backgroundColor: paleta.fondo }]}>
+        <View
+          style={[
+            s.tarjetaEstado,
+            { backgroundColor: paleta.superficie, borderColor: paleta.borde },
+          ]}
+        >
+          <View style={[s.iconoCirculo, { backgroundColor: paleta.acentoSuave }]}>
+            <Text style={[s.iconoTxt, { color: paleta.acento }]}>⌗</Text>
+          </View>
+          <Text style={[s.titulo, { color: paleta.texto }]}>
+            Acceso a cámara para lectura GTIN
+          </Text>
+          <Text style={[s.parrafo, { color: paleta.textoSecundario }]}>
+            Se utiliza únicamente mientras esta vista permanece abierta para decodificar códigos de
+            barras en tu propio dispositivo. No se capturan fotografías, audio ni se envían imágenes
+            por red.
+          </Text>
+          <Boton
+            titulo="Continuar y permitir cámara"
+            onPress={async () => {
+              setExplicado(true);
+              await pedirPermiso();
+            }}
+          />
+          <Boton titulo="Ingresar código manualmente" onPress={onManual} estilo="secundario" />
+          <Boton titulo="Volver al inventario" onPress={onCancelar} estilo="fantasma" compacto />
+        </View>
       </View>
     );
   }
 
-  // 3. Permiso denegado de forma definitiva: el sistema ya no vuelve a
-  //    preguntar, así que hay que mandar al usuario a Ajustes. La app sigue
-  //    siendo útil por la vía manual.
+  // 3. Permiso rechazado (recuperable o bloqueado en Ajustes).
   if (!permiso.granted) {
     return (
-      <View style={s.centro}>
-        <Text style={s.icono}>🔒</Text>
-        <Text style={s.titulo}>Sin acceso a la cámara</Text>
-        <Text style={s.parrafo}>
-          {permiso.canAskAgain
-            ? 'Puedes volver a intentarlo, o seguir trabajando con el código escrito a mano.'
-            : 'El sistema ya no mostrará la ventana de permiso. Puedes activarlo en Ajustes, o seguir trabajando con el código escrito a mano.'}
-        </Text>
-        {permiso.canAskAgain ? (
-          <Boton titulo="Pedir el permiso otra vez" onPress={() => pedirPermiso()} />
-        ) : (
-          <Boton titulo="Abrir Ajustes" onPress={() => Linking.openSettings()} />
-        )}
-        <Boton titulo="Escribir el código a mano" onPress={onManual} estilo="secundario" />
-        <Text style={s.volver} onPress={onCancelar}>
-          Volver
-        </Text>
+      <View style={[s.centro, { backgroundColor: paleta.fondo }]}>
+        <View
+          style={[
+            s.tarjetaEstado,
+            { backgroundColor: paleta.superficie, borderColor: paleta.borde },
+          ]}
+        >
+          <View style={[s.iconoCirculo, { backgroundColor: paleta.ambarSuave }]}>
+            <Text style={[s.iconoTxt, { color: paleta.ambar }]}>!</Text>
+          </View>
+          <Text style={[s.titulo, { color: paleta.texto }]}>Cámara desactivada</Text>
+          <Text style={[s.parrafo, { color: paleta.textoSecundario }]}>
+            {permiso.canAskAgain
+              ? 'Puedes volver a solicitar el permiso de cámara o trabajar normalmente ingresando los números del código a mano.'
+              : 'El permiso fue deshabilitado en el sistema. Puedes activarlo en Ajustes o continuar trabajando con ingreso manual.'}
+          </Text>
+          {permiso.canAskAgain ? (
+            <Boton titulo="Solicitar permiso nuevamente" onPress={() => pedirPermiso()} />
+          ) : (
+            <Boton titulo="Abrir Ajustes del sistema" onPress={() => Linking.openSettings()} />
+          )}
+          <Boton titulo="Escribir código manualmente" onPress={onManual} estilo="secundario" />
+          <Boton titulo="Volver" onPress={onCancelar} estilo="fantasma" compacto />
+        </View>
       </View>
     );
   }
 
-  // 4. Código leído pero inválido: ni el formato ni el dígito verificador
-  //    cuadran. Es un error del lector, no del usuario, y se dice así.
+  // 4. Lectura óptica corrupta (falló validación módulo 10 GS1).
   if (codigoInvalido) {
     return (
-      <View style={s.centro}>
-        <Text style={s.icono}>⚠</Text>
-        <Text style={[s.titulo, { color: C.rojo }]}>Lectura incompleta</Text>
-        <Text style={s.parrafo}>
-          Se leyó <Text style={s.mono}>{codigoInvalido}</Text>, pero no corresponde a un código de
-          barras válido. Suele pasar con etiquetas arrugadas o con poca luz.
-        </Text>
-        <Boton titulo="Escanear de nuevo" onPress={reintentar} />
-        <Boton titulo="Escribir el código a mano" onPress={onManual} estilo="secundario" />
+      <View style={[s.centro, { backgroundColor: paleta.fondo }]}>
+        <View
+          style={[
+            s.tarjetaEstado,
+            { backgroundColor: paleta.superficie, borderColor: paleta.borde },
+          ]}
+        >
+          <View style={[s.iconoCirculo, { backgroundColor: paleta.rojoSuave }]}>
+            <Text style={[s.iconoTxt, { color: paleta.rojo }]}>✕</Text>
+          </View>
+          <Text style={[s.titulo, { color: paleta.texto }]}>Lectura incompleta</Text>
+          <Text style={[s.parrafo, { color: paleta.textoSecundario }]}>
+            Se capturó <Text style={[s.mono, { color: paleta.texto }]}>{codigoInvalido}</Text>, pero
+            no supera el dígito verificador GS1. Acerca el envase o activa la linterna si hay poca
+            luz en la bodega.
+          </Text>
+          <Boton titulo="Intentar lectura nuevamente" onPress={reintentar} />
+          <Boton titulo="Escribir código manualmente" onPress={onManual} estilo="secundario" />
+        </View>
       </View>
     );
   }
 
-  // 5. Todo en orden: cámara activa.
+  // 5. Cámara activa con mirilla tipo iOS Wallet / Scanner y linterna.
   return (
     <View style={s.raiz}>
       {activa ? (
         <CameraView
           style={StyleSheet.absoluteFill}
           facing="back"
+          enableTorch={linterna}
           barcodeScannerSettings={{ barcodeTypes: [...TIPOS] }}
           onBarcodeScanned={alEscanear}
         />
       ) : (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: C.navy }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
       )}
-      <View style={s.marco} pointerEvents="none" />
+
+      {/* Barra superior flotante sobre cámara */}
+      <View style={s.topOverlay}>
+        <Pressable
+          onPress={onCancelar}
+          accessibilityRole="button"
+          accessibilityLabel="Cerrar escáner"
+          style={s.pildoraOscura}
+        >
+          <Text style={s.txtOverlay}>‹ Volver</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setLinterna((v) => !v)}
+          accessibilityRole="button"
+          accessibilityLabel={linterna ? 'Apagar linterna' : 'Encender linterna'}
+          style={[s.pildoraOscura, linterna && { backgroundColor: '#F59E0B' }]}
+        >
+          <Text style={[s.txtOverlay, linterna && { color: '#111114' }]}>
+            {linterna ? '☀ Luz ON' : '☀ Linterna'}
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* Visor central */}
+      <View style={s.visorWrap} pointerEvents="none">
+        <View style={s.marco}>
+          <View style={[s.esquina, s.esqTL]} />
+          <View style={[s.esquina, s.esqTR]} />
+          <View style={[s.esquina, s.esqBL]} />
+          <View style={[s.esquina, s.esqBR]} />
+        </View>
+        <Text style={s.guiaVisor}>Centra el código EAN-13, EAN-8 o UPC-A</Text>
+      </View>
+
+      {/* Panel inferior flotante */}
       <View style={s.pie}>
-        <Text style={s.pieTexto}>Apunta al código de barras del producto</Text>
-        <Boton titulo="Cancelar" onPress={onCancelar} estilo="secundario" />
-        <Text style={s.volver} onPress={onManual}>
-          Escribir el código a mano
-        </Text>
+        <Boton titulo="⌨ Ingresar código manualmente" onPress={onManual} />
       </View>
     </View>
   );
@@ -172,38 +215,100 @@ export function PantallaEscaner({ onLeido, onCancelar, onManual }: Props) {
 
 const s = StyleSheet.create({
   raiz: { flex: 1, backgroundColor: '#000' },
+  topOverlay: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+  },
+  pildoraOscura: {
+    minHeight: TOQUE_MINIMO - 6,
+    paddingHorizontal: 16,
+    borderRadius: 21,
+    backgroundColor: 'rgba(18,18,22,0.78)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  txtOverlay: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  visorWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    gap: 14,
+  },
   marco: {
+    width: '100%',
+    maxWidth: 320,
+    height: 170,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.38)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  esquina: {
     position: 'absolute',
-    top: '28%',
-    left: '10%',
-    right: '10%',
-    height: '24%',
-    borderWidth: 3,
-    borderColor: C.teal,
-    borderRadius: 16,
+    width: 26,
+    height: 26,
+    borderColor: '#30D158',
+  },
+  esqTL: { top: -1, left: -1, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 20 },
+  esqTR: { top: -1, right: -1, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 20 },
+  esqBL: {
+    bottom: -1,
+    left: -1,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderBottomLeftRadius: 20,
+  },
+  esqBR: {
+    bottom: -1,
+    right: -1,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderBottomRightRadius: 20,
+  },
+  guiaVisor: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    backgroundColor: 'rgba(0,0,0,0.58)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   pie: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    padding: 18,
-    paddingBottom: 28,
-    backgroundColor: 'rgba(15,39,64,0.92)',
-    gap: 10,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 22,
+    backgroundColor: 'rgba(18,18,22,0.88)',
   },
-  pieTexto: { color: '#fff', textAlign: 'center', fontSize: 15, fontWeight: '600' },
   centro: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 28,
-    gap: 12,
-    backgroundColor: C.fondo,
+    padding: 20,
   },
-  icono: { fontSize: 46 },
-  titulo: { fontSize: 20, fontWeight: '800', color: C.navy, textAlign: 'center' },
-  parrafo: { fontSize: 15, color: C.gris, textAlign: 'center', lineHeight: 22, marginBottom: 6 },
-  mono: { fontWeight: '800', color: C.navy },
-  volver: { color: C.azul, fontWeight: '700', fontSize: 15, padding: 10 },
+  tarjetaEstado: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 22,
+    padding: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+  },
+  iconoCirculo: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
+  iconoTxt: { fontSize: 26, fontWeight: '800' },
+  titulo: { fontSize: 20, fontWeight: '800', textAlign: 'center', letterSpacing: -0.3 },
+  parrafo: { fontSize: 14.5, textAlign: 'center', lineHeight: 21, marginBottom: 4 },
+  mono: { fontWeight: '800', fontVariant: ['tabular-nums'] },
 });

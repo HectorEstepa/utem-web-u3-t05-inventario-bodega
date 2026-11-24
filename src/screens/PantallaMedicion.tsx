@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
+import { BarraSubpantalla } from '../components/BarraSubpantalla';
 import { Boton } from '../components/Boton';
 import { Cargando } from '../components/Estados';
 import {
@@ -9,12 +10,10 @@ import {
   N_PRODUCTOS,
   type ResultadoBench,
 } from '../bench/medicion';
-import { C } from '../theme';
+import { useTema } from '../theme';
 
 /**
- * Pantalla de medición M1, M2 y M3. Vive dentro de la app para que los números
- * se tomen directamente en el teléfono físico (iPhone en iOS o equipo Android)
- * sin depender de herramientas externas como adb.
+ * Diagnóstico de rendimiento M1, M2 y M3 accesible desde Ajustes.
  */
 export function PantallaMedicion({
   onVolver,
@@ -26,6 +25,7 @@ export function PantallaMedicion({
   muestrasM2: number[];
 }) {
   const db = useSQLiteContext();
+  const { paleta } = useTema();
   const [fase, setFase] = useState<'inicio' | 'corriendo' | 'listo' | 'error'>('inicio');
   const [res, setRes] = useState<ResultadoBench[]>([]);
   const [msg, setMsg] = useState('');
@@ -41,8 +41,9 @@ export function PantallaMedicion({
     }
   };
 
-  if (fase === 'corriendo')
-    return <Cargando texto={`Sembrando ${N_PRODUCTOS} productos y midiendo…`} />;
+  if (fase === 'corriendo') {
+    return <Cargando texto={`Sembrando ${N_PRODUCTOS.toLocaleString('es-CL')} productos y midiendo…`} />;
+  }
 
   const sqlite = res.find((r) => r.motor === 'SQLite');
   const asyncS = res.find((r) => r.motor === 'AsyncStorage');
@@ -53,130 +54,187 @@ export function PantallaMedicion({
       : null;
 
   return (
-    <ScrollView style={s.raiz} contentContainerStyle={s.cont}>
-      <Text style={s.titulo}>Medición M1 · M2 · M3</Text>
-      <Text style={s.parrafo}>
-        M1 busca un producto por su código en una bodega de {N_PRODUCTOS.toLocaleString('es-CL')}{' '}
-        productos, 30 veces por motor, con un código distinto cada vez. Compara SQLite con clave
-        primaria contra AsyncStorage con un arreglo JSON.
-      </Text>
-      <Text style={s.entorno}>
-        Plataforma: {Platform.OS === 'ios' ? 'iOS' : 'Android'} {String(Platform.Version)} · Modo:{' '}
-        {__DEV__ ? 'DESARROLLO (Expo Go / Metro)' : 'RELEASE'}
-      </Text>
+    <View style={[s.raiz, { backgroundColor: paleta.fondo }]}>
+      <BarraSubpantalla
+        titulo="Diagnóstico y benchmark"
+        subtitulo="Telemetría M1 · M2 · M3"
+        onVolver={onVolver}
+      />
 
-      <View style={s.tabla}>
-        <View style={[s.fila, s.cabecera]}>
-          <Text style={[s.celda, s.celdaCab, { flex: 1.6, textAlign: 'left' }]}>
-            Telemetría de sesión
+      <ScrollView contentContainerStyle={s.cont}>
+        <View
+          style={[
+            s.tarjeta,
+            { backgroundColor: paleta.superficie, borderColor: paleta.borde },
+          ]}
+        >
+          <Text style={[s.kicker, { color: paleta.textoSecundario }]}>
+            ENTORNO DE EJECUCIÓN DETECTADO
           </Text>
-          <Text style={[s.celda, s.celdaCab]}>Valor</Text>
-        </View>
-        <View style={s.fila}>
-          <Text style={[s.celda, { flex: 1.6, textAlign: 'left', fontWeight: '700' }]}>
-            M3 · Arranque hasta UI lista
+          <Text style={[s.entorno, { color: paleta.texto }]}>
+            {Platform.OS === 'ios' ? 'iOS' : 'Android'} {String(Platform.Version)} ·{' '}
+            {__DEV__ ? 'Modo Desarrollo (Expo Go / Metro)' : 'Binario Release'}
           </Text>
-          <Text style={s.celda}>
-            {arranqueMs !== null ? `${arranqueMs.toFixed(1)} ms` : '—'}
-          </Text>
-        </View>
-        <View style={s.fila}>
-          <Text style={[s.celda, { flex: 1.6, textAlign: 'left', fontWeight: '700' }]}>
-            M2 · Consulta tras escaneo ({muestrasM2.length} muestras)
-          </Text>
-          <Text style={s.celda}>
-            {promedioM2 !== null ? `${promedioM2.toFixed(2)} ms` : 'Escanea primero'}
-          </Text>
-        </View>
-      </View>
-
-      {__DEV__ ? (
-        <Text style={s.advertencia}>
-          Estás en modo desarrollo ({Platform.OS === 'ios' ? 'Expo Go en iPhone' : 'Expo Go / emulador'}).
-          Registra explícitamente este entorno en el informe: en modo desarrollo el motor JS tiene
-          sobrecarga adicional, aunque la razón relativa entre SQLite y AsyncStorage se mantiene
-          sobre el hardware real.
-        </Text>
-      ) : null}
-
-      {fase === 'error' ? <Text style={s.error}>{msg}</Text> : null}
-
-      {fase === 'listo' ? (
-        <View style={s.tabla}>
-          <View style={[s.fila, s.cabecera]}>
-            <Text style={[s.celda, s.celdaCab, { flex: 1.4, textAlign: 'left' }]}>Motor</Text>
-            <Text style={[s.celda, s.celdaCab]}>p50</Text>
-            <Text style={[s.celda, s.celdaCab]}>p95</Text>
-            <Text style={[s.celda, s.celdaCab]}>peor</Text>
-          </View>
-          {res.map((r) => (
-            <View key={r.motor} style={s.fila}>
-              <Text style={[s.celda, { flex: 1.4, textAlign: 'left', fontWeight: '800' }]}>
-                {r.motor}
+          {__DEV__ ? (
+            <View style={[s.aviso, { backgroundColor: paleta.ambarSuave }]}>
+              <Text style={[s.avisoTxt, { color: paleta.ambar }]}>
+                En Expo Go (__DEV__) ambos motores comparten el mismo hardware real y sobrecarga JS,
+                por lo que la razón relativa entre SQLite y AsyncStorage es reproducible.
               </Text>
-              <Text style={s.celda}>{r.p50.toFixed(2)}</Text>
-              <Text style={s.celda}>{r.p95.toFixed(2)}</Text>
-              <Text style={s.celda}>{r.peor.toFixed(2)}</Text>
             </View>
-          ))}
-          <Text style={s.pie}>Tiempos en milisegundos · 30 muestras por motor</Text>
-          {factor ? (
-            <Text style={s.conclusion}>
-              En p95, AsyncStorage tarda {factor.toFixed(1)} veces lo que SQLite.
-            </Text>
           ) : null}
         </View>
-      ) : null}
 
-      <Boton titulo={fase === 'listo' ? 'Repetir medición M1' : 'Correr medición M1'} onPress={correr} />
-      {fase === 'listo' ? (
-        <Boton
-          titulo="Borrar datos de prueba"
-          onPress={() => limpiarMedicion(db).then(() => setFase('inicio'))}
-          estilo="secundario"
-        />
-      ) : null}
-      <Boton titulo="Volver" onPress={onVolver} estilo="secundario" />
-    </ScrollView>
+        <View
+          style={[
+            s.tarjeta,
+            { backgroundColor: paleta.superficie, borderColor: paleta.borde },
+          ]}
+        >
+          <Text style={[s.kicker, { color: paleta.textoSecundario }]}>
+            TELEMETRÍA DE LA SESIÓN ACTUAL
+          </Text>
+          <View style={s.filaDato}>
+            <Text style={[s.lblDato, { color: paleta.texto }]}>M3 · Arranque hasta UI lista</Text>
+            <Text style={[s.valDato, { color: paleta.acento }]}>
+              {arranqueMs !== null ? `${arranqueMs.toFixed(1)} ms` : '—'}
+            </Text>
+          </View>
+          <View
+            style={[
+              s.filaDato,
+              { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: paleta.separador },
+            ]}
+          >
+            <Text style={[s.lblDato, { color: paleta.texto }]}>
+              M2 · Consulta tras escaneo ({muestrasM2.length} muestras)
+            </Text>
+            <Text style={[s.valDato, { color: paleta.acento }]}>
+              {promedioM2 !== null ? `${promedioM2.toFixed(2)} ms` : 'Escanea primero'}
+            </Text>
+          </View>
+        </View>
+
+        <View
+          style={[
+            s.tarjeta,
+            { backgroundColor: paleta.superficie, borderColor: paleta.borde },
+          ]}
+        >
+          <Text style={[s.kicker, { color: paleta.textoSecundario }]}>
+            PRUEBA M1 · SQLITE VS ASYNCSTORAGE ({N_PRODUCTOS.toLocaleString('es-CL')} SKUS)
+          </Text>
+          <Text style={[s.parrafo, { color: paleta.textoSecundario }]}>
+            Ejecuta 30 búsquedas por código distinto en cada motor sobre 5.000 artículos para medir
+            índice B-tree primario frente a lectura y parseo JSON lineal.
+          </Text>
+
+          {fase === 'error' ? (
+            <Text style={[s.error, { color: paleta.rojo }]}>{msg}</Text>
+          ) : null}
+
+          {fase === 'listo' ? (
+            <View
+              style={[
+                s.tabla,
+                { borderColor: paleta.borde, backgroundColor: paleta.superficieElevada },
+              ]}
+            >
+              <View style={[s.filaTabla, { borderBottomColor: paleta.separador }]}>
+                <Text style={[s.celda, { flex: 1.5, textAlign: 'left', color: paleta.textoTerciario }]}>
+                  MOTOR
+                </Text>
+                <Text style={[s.celda, { color: paleta.textoTerciario }]}>p50</Text>
+                <Text style={[s.celda, { color: paleta.textoTerciario }]}>p95</Text>
+                <Text style={[s.celda, { color: paleta.textoTerciario }]}>peor</Text>
+              </View>
+              {res.map((r) => (
+                <View
+                  key={r.motor}
+                  style={[s.filaTabla, { borderBottomColor: paleta.separador }]}
+                >
+                  <Text
+                    style={[
+                      s.celda,
+                      { flex: 1.5, textAlign: 'left', fontWeight: '800', color: paleta.texto },
+                    ]}
+                  >
+                    {r.motor}
+                  </Text>
+                  <Text style={[s.celda, { color: paleta.texto }]}>{r.p50.toFixed(2)}</Text>
+                  <Text style={[s.celda, { color: paleta.texto, fontWeight: '700' }]}>
+                    {r.p95.toFixed(2)}
+                  </Text>
+                  <Text style={[s.celda, { color: paleta.textoSecundario }]}>
+                    {r.peor.toFixed(2)}
+                  </Text>
+                </View>
+              ))}
+              {factor ? (
+                <Text style={[s.conclusion, { color: paleta.acento }]}>
+                  En percentil 95, AsyncStorage tardó {factor.toFixed(1)}× lo que SQLite (ms).
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
+          <Boton
+            titulo={fase === 'listo' ? 'Repetir prueba M1' : 'Ejecutar prueba M1 (5.000 SKUs)'}
+            onPress={correr}
+          />
+          {fase === 'listo' ? (
+            <Boton
+              titulo="Limpiar tabla temporal de prueba"
+              onPress={() => limpiarMedicion(db).then(() => setFase('inicio'))}
+              estilo="secundario"
+            />
+          ) : null}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  raiz: { flex: 1, backgroundColor: C.fondo },
-  cont: { padding: 18, paddingBottom: 40, gap: 10 },
-  titulo: { fontSize: 22, fontWeight: '900', color: C.navy },
-  parrafo: { fontSize: 15, color: C.gris, lineHeight: 22 },
-  entorno: { fontSize: 13, color: C.navy, fontWeight: '700' },
-  advertencia: {
-    backgroundColor: '#fff7ed',
-    borderLeftWidth: 4,
-    borderLeftColor: C.ambar,
-    borderRadius: 8,
-    padding: 10,
-    color: '#b45309',
-    fontSize: 13,
-    lineHeight: 19,
+  raiz: { flex: 1 },
+  cont: { padding: 16, paddingBottom: 40, gap: 14 },
+  tarjeta: {
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 10,
   },
-  error: { color: C.rojo, fontWeight: '700' },
+  kicker: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6 },
+  entorno: { fontSize: 15, fontWeight: '700' },
+  aviso: { borderRadius: 12, padding: 11 },
+  avisoTxt: { fontSize: 13, fontWeight: '600', lineHeight: 18 },
+  filaDato: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 8,
+  },
+  lblDato: { flex: 1, fontSize: 14, fontWeight: '600' },
+  valDato: { fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  parrafo: { fontSize: 14, lineHeight: 20 },
+  error: { fontSize: 14, fontWeight: '700' },
   tabla: {
-    backgroundColor: C.blanco,
-    borderWidth: 1,
-    borderColor: C.linea,
-    borderRadius: 12,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
-    marginVertical: 6,
   },
-  fila: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.linea },
-  cabecera: { backgroundColor: C.navy },
+  filaTabla: {
+    flexDirection: 'row',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
   celda: {
     flex: 1,
-    padding: 9,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
     fontSize: 13,
-    color: C.navy,
     textAlign: 'right',
     fontVariant: ['tabular-nums'],
   },
-  celdaCab: { color: '#fff', fontWeight: '800' },
-  pie: { padding: 9, fontSize: 12, color: C.gris },
-  conclusion: { padding: 10, fontSize: 15, fontWeight: '800', color: C.azulOscuro },
+  conclusion: { padding: 12, fontSize: 14, fontWeight: '800' },
 });

@@ -1,25 +1,23 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 /**
- * Esquema y migraciones de la base local.
+ * Esquema y migraciones incrementales de la base local SQLite.
  *
- * Decisión de rendimiento: el stock se guarda como columna en `productos`
- * y además queda la bitácora completa en `movimientos`. Calcular el stock
- * con SUM() sobre la bitácora en cada render sería O(movimientos) y crece
- * para siempre; la columna se lee en O(1). La consistencia entre ambas se
- * garantiza porque todo movimiento se escribe dentro de una transacción
- * junto con el UPDATE del stock.
- *
- * El CHECK(stock >= 0) es la última línea de defensa: aunque la interfaz
- * falle, el motor rechaza un stock negativo.
+ * Decisiones de rendimiento y consistencia:
+ * 1. El stock se guarda como columna en `productos` (lectura O(1)) y además
+ *    queda la bitácora completa en `movimientos` sincronizada en transacción
+ *    exclusiva, evitando `SUM()` lineal sobre miles de eventos históricos.
+ * 2. Los precios en pesos chilenos (`precio` y `precio_unitario`) se guardan
+ *    como `INTEGER` no negativos, nunca coma flotante. `precio_unitario` en
+ *    `movimientos` congela el valor vigente al instante de la entrada/salida
+ *    para que cambiar un precio mañana no altere la contabilidad histórica.
+ * 3. `PRAGMA user_version` permite migrar de v1 → v2 con `ALTER TABLE` sin
+ *    perder los productos que el usuario ya tenía registrados en el teléfono.
  */
 
-export const VERSION_ESQUEMA = 1;
+export const VERSION_ESQUEMA = 2;
 
 export async function migrar(db: SQLiteDatabase): Promise<void> {
-  // WAL mejora el rendimiento general de escritura y permite leer mientras
-  // se escribe, que es justo lo que pasa al registrar un movimiento con la
-  // lista abierta detrás. Recomendado por la documentación de expo-sqlite.
   await db.execAsync('PRAGMA journal_mode = WAL');
   await db.execAsync('PRAGMA foreign_keys = ON');
 
@@ -27,31 +25,40 @@ export async function migrar(db: SQLiteDatabase): Promise<void> {
   const actual = fila?.user_version ?? 0;
   if (actual >= VERSION_ESQUEMA) return;
 
-  await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS productos (
-      codigo      TEXT    PRIMARY KEY,
-      nombre      TEXT    NOT NULL,
-      stock       INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
-      minimo      INTEGER NOT NULL DEFAULT 5 CHECK (minimo >= 0),
-      creado_en   INTEGER NOT NULL
-    );
+  if (actual < 1) {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS productos (
+        codigo      TEXT    PRIMARY KEY,
+        nombre      TEXT    NOT NULL,
+        stock       INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+        minimo      INTEGER NOT NULL DEFAULT 5 CHECK (minimo >= 0),
+        precio      INTEGER NOT NULL DEFAULT 0 CHECK (precio >= 0),
+        creado_en   INTEGER NOT NULL
+      );
 
-    CREATE TABLE IF NOT EXISTS movimientos (
-      id       INTEGER PRIMARY KEY AUTOINCREMENT,
-      codigo   TEXT    NOT NULL REFERENCES productos(codigo) ON DELETE CASCADE,
-      tipo     TEXT    NOT NULL CHECK (tipo IN ('IN','OUT')),
-      cantidad INTEGER NOT NULL CHECK (cantidad > 0),
-      fecha    INTEGER NOT NULL
-    );
+      CREATE TABLE IF NOT EXISTS movimientos (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        codigo          TEXT    NOT NULL REFERENCES productos(codigo) ON DELETE CASCADE,
+        tipo            TEXT    NOT NULL CHECK (tipo IN ('IN','OUT')),
+        cantidad        INTEGER NOT NULL CHECK (cantidad > 0),
+        precio_unitario INTEGER NOT NULL DEFAULT 0 CHECK (precio_unitario >= 0),
+        nota            TEXT    NOT NULL DEFAULT '',
+        fecha           INTEGER NOT NULL
+      );
 
-    -- Sin este índice, el historial de un producto obliga a recorrer la
-    -- tabla completa. Con 20.000 movimientos eso se nota en pantalla.
-    CREATE INDEX IF NOT EXISTS idx_mov_codigo ON movimientos(codigo, fecha DESC);
-
-    -- El filtro de stock bajo compara stock contra minimo, así que un índice
-    -- por stock acelera el orden de la lista cuando hay miles de productos.
-    CREATE INDEX IF NOT EXISTS idx_prod_stock ON productos(stock);
-  `);
+      CREATE INDEX IF NOT EXISTS idx_mov_codigo ON movimientos(codigo, fecha DESC);
+      CREATE INDEX IF NOT EXISTS idx_mov_fecha ON movimientos(fecha DESC);
+      CREATE INDEX IF NOT EXISTS idx_prod_stock ON productos(stock);
+    `);
+  } else if (actual === 1) {
+    // Migración no destructiva desde v1: conserva todo el inventario previo.
+    await db.execAsync(`
+      ALTER TABLE productos ADD COLUMN precio INTEGER NOT NULL DEFAULT 0 CHECK (precio >= 0);
+      ALTER TABLE movimientos ADD COLUMN precio_unitario INTEGER NOT NULL DEFAULT 0 CHECK (precio_unitario >= 0);
+      ALTER TABLE movimientos ADD COLUMN nota TEXT NOT NULL DEFAULT '';
+      CREATE INDEX IF NOT EXISTS idx_mov_fecha ON movimientos(fecha DESC);
+    `);
+  }
 
   await db.execAsync(`PRAGMA user_version = ${VERSION_ESQUEMA}`);
 }

@@ -1,15 +1,8 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
-import { C, TOQUE_MINIMO } from '../theme';
+import { Pressable, StyleSheet, Text, type ViewStyle } from 'react-native';
+import { TOQUE_MINIMO, useTema } from '../theme';
 
-type Estilo = 'primario' | 'secundario' | 'peligro' | 'exito';
-
-const FONDO: Record<Estilo, string> = {
-  primario: C.azul,
-  secundario: C.blanco,
-  peligro: C.rojo,
-  exito: C.verde,
-};
+type Estilo = 'primario' | 'secundario' | 'peligro' | 'exito' | 'fantasma';
 
 export function Boton({
   titulo,
@@ -17,31 +10,51 @@ export function Boton({
   estilo = 'primario',
   deshabilitado = false,
   ancho,
+  compacto = false,
 }: {
   titulo: string;
   onPress: () => void;
   estilo?: Estilo;
   deshabilitado?: boolean;
   ancho?: ViewStyle['width'];
+  compacto?: boolean;
 }) {
-  const secundario = estilo === 'secundario';
+  const { paleta } = useTema();
+
+  const fondo: Record<Estilo, string> = {
+    primario: paleta.acento,
+    secundario: paleta.superficieElevada,
+    peligro: paleta.rojo,
+    exito: paleta.verde,
+    fantasma: 'transparent',
+  };
+
+  const colorTexto: Record<Estilo, string> = {
+    primario: '#FFFFFF',
+    secundario: paleta.acento,
+    peligro: '#FFFFFF',
+    exito: '#FFFFFF',
+    fantasma: paleta.acento,
+  };
+
   return (
     <Pressable
       onPress={onPress}
       disabled={deshabilitado}
-      // accessibilityRole y accessibilityState hacen que TalkBack lea el
-      // botón como botón y anuncie si está deshabilitado.
       accessibilityRole="button"
       accessibilityState={{ disabled: deshabilitado }}
       style={({ pressed }) => [
         s.base,
-        { backgroundColor: FONDO[estilo], width: ancho },
-        secundario && { borderWidth: 2, borderColor: C.azul },
-        deshabilitado && { opacity: 0.45 },
-        pressed && !deshabilitado && { opacity: 0.8 },
+        compacto ? s.compacto : null,
+        { backgroundColor: fondo[estilo], width: ancho },
+        estilo === 'secundario' && { borderWidth: 1, borderColor: paleta.borde },
+        deshabilitado && { opacity: 0.42 },
+        pressed && !deshabilitado && { opacity: 0.76, transform: [{ scale: 0.99 }] },
       ]}
     >
-      <Text style={[s.texto, secundario && { color: C.azul }]}>{titulo}</Text>
+      <Text style={[s.texto, compacto && s.textoCompacto, { color: colorTexto[estilo] }]}>
+        {titulo}
+      </Text>
     </Pressable>
   );
 }
@@ -49,13 +62,26 @@ export function Boton({
 const s = StyleSheet.create({
   base: {
     minHeight: TOQUE_MINIMO,
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Sin altura fija: si el usuario tiene el tamaño de letra del sistema
-  // aumentado, el texto crece y el botón crece con él en vez de cortarse.
-  texto: { color: C.blanco, fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  compacto: {
+    minHeight: 40,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 11,
+  },
+  texto: {
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: -0.2,
+  },
+  textoCompacto: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
