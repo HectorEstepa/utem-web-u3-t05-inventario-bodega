@@ -1,0 +1,16 @@
+node_modules/
+.expo/
+dist/
+web-build/
+*.log
+.DS_Store
+
+# Nunca al repositorio: claves y credenciales.
+# Borrarlas después de subirlas NO las saca del historial.
+.env
+.env.*
+*.keystore
+*.jks
+google-services.json
+GoogleService-Info.plist
+credentials.json

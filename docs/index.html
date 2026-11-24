@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>T05 · Inventario de bodega con código de barras · UTEM 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--blue:#0d63a5;--blue-d:#08497c;--navy:#0f2740;--navy2:#1a3a5c;--teal:#14b8a6;--teal-l:#5eead4;
+--sun:#f59e0b;--rose:#e11d48;--grn:#16a34a;--vio:#7c3aed;--muted:#5b7997;--line:#dbe7f3;--bg:#eef4fa;
+--hdr:74px;--ftr:32px;--tr:cubic-bezier(.4,0,.2,1)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--navy);display:flex;flex-direction:column;
+ overflow:hidden;color:#12283f}
+header{height:var(--hdr);flex-shrink:0;background:linear-gradient(135deg,var(--blue),var(--blue-d));
+ display:flex;align-items:center;gap:14px;padding:0 22px;color:#fff;z-index:50;
+ box-shadow:0 4px 20px rgba(13,99,165,.3)}
+.logo{height:54px;display:flex;align-items:center;background:#fff;border-radius:11px;padding:6px 13px;
+ box-shadow:0 3px 12px rgba(0,0,0,.18);flex-shrink:0}
+.logo img{height:40px;width:auto;display:block}
+.logo-fb{height:42px;width:42px;border-radius:10px;background:var(--navy);display:none;place-items:center;
+ font-weight:900;font-size:13px;color:var(--teal-l)}
+.htx h1{font-size:clamp(13px,1.2vw,18px);font-weight:800;line-height:1.15}
+.htx p{font-size:clamp(10px,.9vw,13px);opacity:.85;margin-top:3px}
+#chips{margin-left:auto;display:flex;gap:6px;background:rgba(255,255,255,.1);padding:5px 8px;
+ border-radius:22px;flex-shrink:0}
+.chp{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);color:#eaf5ff;
+ font-size:clamp(10px,.9vw,13px);font-weight:800;padding:5px clamp(9px,1vw,15px);border-radius:15px;
+ cursor:pointer;transition:.15s;font-family:inherit}
+.chp:hover{background:rgba(255,255,255,.3)}
+.chp.on{background:var(--teal-l);color:#04302a;border-color:var(--teal-l)}
+main{flex:1;position:relative;min-height:0;background:var(--bg);overflow:hidden}
+#pb{position:absolute;top:0;left:0;height:4px;z-index:40;
+ background:linear-gradient(90deg,var(--blue),var(--teal-l));transition:width .4s var(--tr)}
+.slide{position:absolute;inset:16px 70px 54px;display:flex;flex-direction:column;overflow-y:auto;
+ opacity:0;transform:translate3d(30px,0,0);pointer-events:none;
+ transition:opacity .35s var(--tr),transform .35s var(--tr)}
+.slide.on{opacity:1;transform:none;pointer-events:auto;z-index:3}
+footer{height:var(--ftr);flex-shrink:0;background:linear-gradient(135deg,var(--navy),var(--navy2));
+ color:var(--teal-l);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;
+ letter-spacing:1.4px;text-transform:uppercase}
+.badge{display:inline-block;background:var(--blue);color:#fff;font-size:clamp(9px,.8vw,12px);font-weight:800;
+ padding:4px 11px;border-radius:13px;letter-spacing:.8px;text-transform:uppercase;width:fit-content;
+ margin-bottom:9px}
+h1.t{font-size:clamp(20px,2.4vw,36px);line-height:1.14;font-weight:900;color:var(--navy);
+ margin-bottom:9px;letter-spacing:-.4px}
+h1.t em{font-style:normal;color:var(--blue);border-bottom:5px solid var(--teal-l);padding-bottom:1px}
+.idea{font-size:clamp(12.5px,1.25vw,20px);line-height:1.5;color:#24425f;font-weight:500;
+ margin-bottom:14px;max-width:104ch}
+.idea b{color:var(--blue);font-weight:800}
+.row{display:grid;gap:14px;align-items:start}
+.c2{grid-template-columns:1fr 1fr}
+.c3{grid-template-columns:repeat(3,1fr)}
+.c21{grid-template-columns:1.5fr 1fr}
+@media(max-width:1000px){.c2,.c3,.c21{grid-template-columns:1fr}}
+.card{background:#fff;border:1.5px solid var(--line);border-left:5px solid var(--blue);border-radius:12px;
+ padding:clamp(11px,1vw,17px);box-shadow:0 4px 14px rgba(13,99,165,.07)}
+.card b.h{display:block;font-size:clamp(9.5px,.85vw,12.5px);font-weight:800;color:var(--blue);
+ text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+.card p,.card li{font-size:clamp(11.5px,1vw,15.5px);line-height:1.52;color:#2a4a68}
+.card ul{margin-left:18px;margin-top:4px}
+.card.t{border-left-color:var(--teal)}.card.t b.h{color:#0d9488}
+.card.s{border-left-color:var(--sun)}.card.s b.h{color:#b45309}
+.card.r{border-left-color:var(--rose)}.card.r b.h{color:var(--rose)}
+.card.g{border-left-color:var(--grn)}.card.g b.h{color:#15803d}
+.card.v{border-left-color:var(--vio)}.card.v b.h{color:var(--vio)}
+pre{background:var(--navy);color:#e6f0f8;border-radius:11px;padding:13px 15px;
+ font-family:'JetBrains Mono',monospace;font-size:clamp(9.5px,.88vw,13.5px);line-height:1.62;
+ overflow:auto;white-space:pre}
+pre .k{color:var(--teal-l)}pre .s{color:#fda4af}pre .c{color:#7e9ab5}pre .n{color:#fdba74}pre .f{color:#93c5fd}
+table{width:100%;border-collapse:collapse;font-size:clamp(10.5px,.95vw,14.5px);background:#fff;
+ border-radius:11px;overflow:hidden;box-shadow:0 4px 14px rgba(13,99,165,.07)}
+th{background:var(--navy);color:#fff;text-align:left;padding:8px 11px;font-weight:800;
+ font-size:clamp(9.5px,.85vw,12.5px);text-transform:uppercase;letter-spacing:.5px}
+td{padding:8px 11px;border-bottom:1px solid var(--line);vertical-align:top;color:#2a4a68}
+tbody tr:nth-child(even){background:#f8fbfe}
+td.c,th.c{text-align:center}
+.cover{flex:1;display:flex;flex-direction:column;justify-content:center;
+ background:linear-gradient(135deg,var(--navy),var(--blue-d));color:#fff;border-radius:18px;
+ padding:clamp(22px,3.2vw,56px)}
+.cover .cb{background:rgba(94,234,212,.18);color:var(--teal-l);font-size:clamp(10px,.95vw,14px);
+ font-weight:800;padding:6px 16px;border-radius:18px;letter-spacing:1px;margin-bottom:clamp(12px,1.5vw,22px);
+ width:fit-content}
+.cover h1{font-size:clamp(26px,4.2vw,66px);line-height:1.07;letter-spacing:-1px;
+ margin-bottom:clamp(10px,1.3vw,20px);max-width:21ch;font-weight:900}
+.cover h1 em{color:var(--teal-l);font-style:normal}
+.cover p{font-size:clamp(12px,1.4vw,22px);opacity:.93;line-height:1.5;max-width:76ch;
+ margin-bottom:clamp(12px,1.6vw,24px)}
+.cover ul{list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:9px}
+.cover li{background:rgba(255,255,255,.09);border-left:3px solid var(--teal-l);
+ padding:clamp(7px,.85vw,13px) clamp(10px,1vw,17px);font-size:clamp(10.5px,1.05vw,16px);
+ line-height:1.4;border-radius:0 8px 8px 0}
+.nb{position:absolute;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;
+ background:#fff;border:2px solid var(--blue);color:var(--blue);font-size:17px;cursor:pointer;z-index:30;
+ display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(13,99,165,.22);
+ opacity:.6;transition:.15s;font-family:inherit}
+.nb:hover{background:var(--blue);color:#fff;opacity:1}
+.nb.p{left:14px}.nb.n{right:14px}
+.hint{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:30;color:var(--muted);
+ font-size:11px;font-weight:600;background:rgba(255,255,255,.9);padding:5px 14px;border-radius:14px;
+ border:1px solid var(--line)}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:4px 10px;color:#fff;
+ font-size:clamp(10px,.9vw,13px);font-weight:800}
+.ok{background:var(--grn)}.low{background:var(--sun)}.out{background:var(--rose)}
+.phone{background:#fff;border:2px solid var(--line);border-radius:14px;padding:10px;display:grid;gap:7px}
+.prow{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--line);
+ border-left:5px solid var(--grn);border-radius:9px;padding:8px 10px}
+.prow.l{border-left-color:var(--sun)}.prow.o{border-left-color:var(--rose)}
+.pname{font-weight:700;color:var(--navy);font-size:clamp(11px,.95vw,14.5px)}
+.pcode{font-family:'JetBrains Mono',monospace;font-size:clamp(9px,.78vw,11.5px);color:var(--muted)}
+.pnum{font-weight:900;font-size:clamp(17px,1.6vw,25px);font-variant-numeric:tabular-nums}
+.note{font-size:clamp(10px,.88vw,13px);color:var(--muted);margin-top:8px;line-height:1.5}
+.ph{background:#fff7ed;border:1.5px dashed var(--sun);border-radius:9px;padding:8px 11px;
+ color:#b45309;font-weight:700;font-size:clamp(10px,.9vw,13.5px)}
+.bar{height:26px;border-radius:6px;display:flex;align-items:center;padding-left:9px;color:#fff;
+ font-weight:800;font-size:clamp(10px,.85vw,12.5px);min-width:52px}
+@media print{
+ html,body{height:auto;overflow:visible;background:#fff}
+ header{position:static}.nb,#chips,#pb,.hint{display:none}
+ .slide{position:static;opacity:1;transform:none;pointer-events:auto;page-break-after:always;
+  display:flex!important;inset:auto;padding:18px;min-height:auto}
+ main{overflow:visible;height:auto}
+}
+</style></head><body>
+
+<header>
+ <div class="logo">
+  <img src="https://cdn.remotexs.co/institute-logos/sibutemnewlogo1.png" alt="UTEM"
+   onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">
+  <div class="logo-fb">UTEM</div>
+ </div>
+ <div class="htx"><h1>T05 · Inventario de bodega con lectura de código de barras</h1>
+ <p>Evaluación Unidad 3 · Desarrollo de Aplicaciones Móviles y Web · UTEM 2026</p></div>
+ <nav id="chips"></nav>
+</header>
+
+<main id="stage"><div id="pb"></div>
+<button class="nb p" id="pv" aria-label="Anterior">‹</button>
+<button class="nb n" id="nx" aria-label="Siguiente">›</button>
+
+<!-- 1 -->
+<section class="slide on" data-tag="●">
+ <div class="cover">
+  <span class="cb">UTEM · UNIDAD 3 · NOVIEMBRE 2026</span>
+  <h1>Contar la bodega sin <em>contar la bodega</em></h1>
+  <p>Una app móvil (iOS y Android) que lee el código de barras del producto, registra su entrada o
+   su salida y avisa cuando queda poco. Todo en el teléfono, sin servidor y sin conexión.</p>
+  <ul>
+   <li>Walter Olarte</li>
+   <li>Ulises Estepa</li>
+   <li>Camilo Arteaga</li>
+   <li>Expo · React Native · TypeScript · SQLite</li>
+  </ul>
+ </div>
+</section>
+
+<!-- 2 -->
+<section class="slide" data-tag="1">
+ <span class="badge">El problema</span>
+ <h1 class="t">El cuaderno no sabe cuántos <em>quedan</em></h1>
+ <p class="idea">En <b>[nombre del local]</b> el stock se controla a ojo. Dos cosas fallan siempre:
+  un producto se agota sin que nadie lo note hasta que un cliente lo pide, y otro se compra de más
+  porque quedaban cajas atrás.</p>
+ <div class="row c3">
+  <div class="card r"><b class="h">Lo que pasa hoy</b>
+   <p>Alguien recorre la estantería, cuenta a ojo y anota en un cuaderno. El número envejece el
+    mismo día.</p></div>
+  <div class="card s"><b class="h">Lo que ya existe</b>
+   <p>Cada producto trae impreso un identificador único, y cada teléfono trae un lector capaz de
+    leerlo. Falta unirlos.</p></div>
+  <div class="card t"><b class="h">Lo que construimos</b>
+   <p>Escanear, registrar el movimiento y ver el stock al instante. Sin escribir el código, sin
+    contar la estantería.</p></div>
+ </div>
+ <p class="note">El dato que cambia la decisión del dueño no es el inventario de ayer: es cuántas
+  unidades hay ahora.</p>
+</section>
+
+<!-- 3 -->
+<section class="slide" data-tag="2">
+ <span class="badge">Alcance</span>
+ <h1 class="t">Lo que hace y lo que <em>deliberadamente</em> no hace</h1>
+ <div class="row c2">
+  <div class="card g"><b class="h">Dentro del alcance</b>
+   <ul>
+    <li>Escaneo del código de barras con la cámara</li>
+    <li>Alta de un producto nuevo cuando el código no existe</li>
+    <li>Movimientos de entrada y de salida</li>
+    <li>Alerta visual cuando el stock llega al mínimo</li>
+    <li>Búsqueda, filtro de stock bajo e historial</li>
+    <li>Ingreso manual del código como ruta alternativa</li>
+   </ul></div>
+  <div class="card r"><b class="h">Fuera del alcance, y por qué</b>
+   <ul>
+    <li><b>Sincronización entre teléfonos.</b> Necesita servidor, cuentas y resolución de
+     conflictos sin conexión. Hacerlo a medias pierde datos en silencio.</li>
+    <li><b>Precios, ventas y proveedores.</b> Es otro producto.</li>
+    <li><b>Quién hizo cada movimiento.</b> Ese campo convertiría la bitácora en un registro de
+     actividad de trabajadores identificables.</li>
+   </ul></div>
+ </div>
+ <p class="note">Una limitación reconocida suma. Una limitación escondida se nota.</p>
+</section>
+
+<!-- 4 -->
+<section class="slide" data-tag="3">
+ <span class="badge">Arquitectura</span>
+ <h1 class="t">Cuatro capas y una <em>regla verificable</em></h1>
+ <div class="row c21">
+  <div>
+   <svg viewBox="0 0 640 300" style="width:100%;height:auto">
+    <g font-family="Inter,sans-serif">
+     <rect x="60" y="10" width="520" height="54" rx="11" fill="#fff" stroke="#0d63a5" stroke-width="2.4"/>
+     <text x="320" y="33" text-anchor="middle" font-size="16" font-weight="800" fill="#0d63a5">Pantallas · src/screens</text>
+     <text x="320" y="52" text-anchor="middle" font-size="12.5" fill="#5b7997">Lista · Escáner · Manual · Ficha · Alta · Medición</text>
+     <line x1="320" y1="64" x2="320" y2="84" stroke="#5b7997" stroke-width="2.2"/>
+     <rect x="60" y="84" width="520" height="54" rx="11" fill="#fff" stroke="#14b8a6" stroke-width="2.4"/>
+     <text x="320" y="107" text-anchor="middle" font-size="16" font-weight="800" fill="#0d9488">Lógica · src/lib</text>
+     <text x="320" y="126" text-anchor="middle" font-size="12.5" fill="#5b7997">gtin.ts validación GS1 · stock.ts estado derivado</text>
+     <line x1="320" y1="138" x2="320" y2="158" stroke="#5b7997" stroke-width="2.2"/>
+     <rect x="60" y="158" width="520" height="54" rx="11" fill="#fff" stroke="#7c3aed" stroke-width="2.4"/>
+     <text x="320" y="181" text-anchor="middle" font-size="16" font-weight="800" fill="#7c3aed">Datos · src/db</text>
+     <text x="320" y="200" text-anchor="middle" font-size="12.5" fill="#5b7997">inventario.ts consultas · schema.ts tablas e índices</text>
+     <line x1="320" y1="212" x2="320" y2="232" stroke="#5b7997" stroke-width="2.2"/>
+     <rect x="60" y="232" width="520" height="52" rx="11" fill="#0f2740"/>
+     <text x="320" y="255" text-anchor="middle" font-size="16" font-weight="800" fill="#5eead4">expo-sqlite</text>
+     <text x="320" y="273" text-anchor="middle" font-size="12.5" fill="#9db4c9">bodega.db · en el teléfono, sin red</text>
+    </g>
+   </svg>
+  </div>
+  <div style="display:grid;gap:10px">
+   <div class="card"><b class="h">La regla, comprobable</b>
+    <p>Ningún archivo de <code>src/screens</code> ni de <code>src/components</code> contiene
+     <code>SELECT</code>, <code>INSERT</code> ni <code>UPDATE</code>.</p></div>
+   <div class="card t"><b class="h">Lo que eso compra</b>
+    <p>Cambiar de motor de almacenamiento obliga a modificar un solo archivo.</p></div>
+   <div class="card v"><b class="h">Y además</b>
+    <p><code>src/lib</code> no importa React ni Expo, así que se prueba con Node sin levantar la
+     app. Por eso pudimos verificar el dígito verificador antes de escribir la primera pantalla.</p></div>
+  </div>
+ </div>
+</section>
+
+<!-- 5 -->
+<section class="slide" data-tag="4">
+ <span class="badge">Decisiones</span>
+ <h1 class="t">Lo que elegimos y lo que <em>descartamos</em></h1>
+ <table>
+  <thead><tr><th>Decisión</th><th>Se eligió</th><th>Se descartó</th><th>Razón</th></tr></thead>
+  <tbody>
+   <tr><td>Enfoque</td><td><b>Híbrido, React Native</b></td><td>Nativo (Swift / Kotlin)</td>
+    <td>Un equipo y un código base iOS/Android</td></tr>
+   <tr><td>Almacenamiento</td><td><b>SQLite con clave primaria</b></td><td>AsyncStorage con arreglo JSON</td>
+    <td>Medición M1</td></tr>
+   <tr><td>Stock</td><td><b>Columna más bitácora</b></td><td>Calcularlo con <code>SUM()</code></td>
+    <td>Lectura en tiempo constante</td></tr>
+   <tr><td>Estado del stock</td><td><b>Derivado en memoria</b></td><td>Columna guardada</td>
+    <td>No se puede desincronizar</td></tr>
+   <tr><td>Navegación</td><td><b>Unión discriminada propia</b></td><td>expo-router</td>
+    <td>Seis pantallas, flujo lineal</td></tr>
+   <tr><td>Tipos de código</td><td><b>ean13, ean8, upc_a</b></td><td>Los trece soportados</td>
+    <td>Menos lecturas falsas</td></tr>
+  </tbody>
+ </table>
+ <p class="note">De las seis, la segunda es la que se midió. Las otras se justifican por el caso.</p>
+</section>
+
+<!-- 6 -->
+<section class="slide" data-tag="5">
+ <span class="badge">Permisos</span>
+ <h1 class="t">Un permiso rechazado no puede <em>romper la app</em></h1>
+ <p class="idea">La ventana del sistema no deja cambiar su texto. Por eso la explicación va antes,
+  en una pantalla propia, y el permiso se pide cuando el usuario toca Escanear.</p>
+ <div class="row c21">
+  <div>
+   <svg viewBox="0 0 620 270" style="width:100%;height:auto">
+    <g font-family="Inter,sans-serif" font-size="12.5">
+     <rect x="215" y="6" width="190" height="34" rx="9" fill="#eaf4fd" stroke="#0d63a5" stroke-width="2"/>
+     <text x="310" y="28" text-anchor="middle" font-weight="700" fill="#08497c">Usuario toca Escanear</text>
+     <line x1="310" y1="40" x2="310" y2="58" stroke="#5b7997" stroke-width="2"/>
+     <rect x="195" y="58" width="230" height="34" rx="9" fill="#fff7ed" stroke="#f59e0b" stroke-width="2"/>
+     <text x="310" y="80" text-anchor="middle" font-weight="700" fill="#b45309">¿permission.granted?</text>
+     <line x1="195" y1="75" x2="120" y2="75" stroke="#e11d48" stroke-width="2"/>
+     <text x="157" y="68" text-anchor="middle" fill="#e11d48" font-weight="700">no</text>
+     <line x1="425" y1="75" x2="505" y2="75" stroke="#16a34a" stroke-width="2"/>
+     <text x="465" y="68" text-anchor="middle" fill="#16a34a" font-weight="700">sí</text>
+     <rect x="440" y="92" width="130" height="40" rx="9" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+     <text x="505" y="109" text-anchor="middle" font-weight="800" fill="#15803d">Cámara activa</text>
+     <text x="505" y="124" text-anchor="middle" fill="#5b7997" font-size="11">tipos restringidos</text>
+     <line x1="505" y1="75" x2="505" y2="92" stroke="#16a34a" stroke-width="2"/>
+     <rect x="30" y="92" width="180" height="44" rx="9" fill="#fff" stroke="#0d63a5" stroke-width="2"/>
+     <text x="120" y="110" text-anchor="middle" font-weight="800" fill="#0d63a5">Explicación propia</text>
+     <text x="120" y="127" text-anchor="middle" fill="#5b7997" font-size="11">para qué y qué no se guarda</text>
+     <line x1="120" y1="75" x2="120" y2="92" stroke="#e11d48" stroke-width="2"/>
+     <line x1="120" y1="136" x2="120" y2="156" stroke="#5b7997" stroke-width="2"/>
+     <rect x="20" y="156" width="200" height="30" rx="8" fill="#eaf4fd" stroke="#0d63a5" stroke-width="1.6"/>
+     <text x="120" y="176" text-anchor="middle" font-weight="700" fill="#08497c">requestPermission()</text>
+     <line x1="70" y1="186" x2="70" y2="206" stroke="#5b7997" stroke-width="2"/>
+     <line x1="175" y1="186" x2="175" y2="206" stroke="#5b7997" stroke-width="2"/>
+     <rect x="14" y="206" width="112" height="46" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.6"/>
+     <text x="70" y="224" text-anchor="middle" font-weight="700" fill="#15803d" font-size="11.5">canAskAgain</text>
+     <text x="70" y="241" text-anchor="middle" fill="#5b7997" font-size="11">"Pedir otra vez"</text>
+     <rect x="134" y="206" width="112" height="46" rx="8" fill="#fff1f2" stroke="#e11d48" stroke-width="1.6"/>
+     <text x="190" y="224" text-anchor="middle" font-weight="700" fill="#e11d48" font-size="11.5">denegado</text>
+     <text x="190" y="241" text-anchor="middle" fill="#5b7997" font-size="11">"Abrir Ajustes"</text>
+     <rect x="300" y="196" width="290" height="56" rx="11" fill="#0f2740"/>
+     <text x="445" y="219" text-anchor="middle" font-weight="800" fill="#5eead4" font-size="14">Ingreso manual del código</text>
+     <text x="445" y="239" text-anchor="middle" fill="#9db4c9" font-size="11.5">la app sigue sirviendo, con la misma validación</text>
+     <line x1="246" y1="229" x2="298" y2="229" stroke="#5eead4" stroke-width="2.4"/>
+    </g>
+   </svg>
+  </div>
+  <div style="display:grid;gap:10px">
+   <div class="card"><b class="h">El quinto estado</b>
+    <p><code>permission</code> vale <code>null</code> mientras el sistema lo consulta. Tratar ese
+     nulo como "denegado" hace parpadear la explicación cada vez que se abre el escáner.</p></div>
+   <div class="card t"><b class="h">Lo que pedimos</b>
+    <p>Solo cámara. Sin micrófono: <code>recordAudioAndroid: false</code> en app.json.</p></div>
+   <div class="card g"><b class="h">La prueba</b>
+    <p>Si el usuario dice que no, escribe los dígitos impresos bajo las barras y trabaja igual.</p></div>
+  </div>
+ </div>
+</section>
+
+<!-- 7 -->
+<section class="slide" data-tag="6">
+ <span class="badge">El escáner</span>
+ <h1 class="t">Tres detalles que no se ven y <em>deciden si sirve</em></h1>
+ <div class="row c3">
+  <div class="card r"><b class="h">1 · El candado</b>
+   <p><code>onBarcodeScanned</code> se dispara varias veces por segundo sobre el mismo código.
+    Sin candado, un escaneo abre la ficha una docena de veces.</p>
+   <p style="margin-top:6px"><code>useRef</code> bloquea tras la primera lectura y se libera al
+    volver a la cámara.</p></div>
+  <div class="card s"><b class="h">2 · La cámara apagada</b>
+   <p>La documentación advierte que solo puede haber una vista previa activa y que hay que
+    desmontarla al perder el foco.</p>
+   <p style="margin-top:6px">Escuchamos <code>AppState</code> y limpiamos la suscripción en el
+    retorno del efecto. Olvidar esa limpieza no da error: solo gasta batería.</p></div>
+  <div class="card t"><b class="h">3 · Los tipos</b>
+   <p>Aceptar los trece tipos que soporta la biblioteca multiplica las lecturas falsas sobre
+    etiquetas de precio y códigos QR de publicidad.</p>
+   <p style="margin-top:6px">Restringimos a tres. Dejamos fuera code128, que es alfanumérico y de largo libre: nunca pasaría la validación del dígito verificador, así que el usuario solo vería "lectura incompleta".</p></div>
+ </div>
+ <pre><span class="c">// src/screens/PantallaEscaner.tsx</span>
+<span class="k">const</span> TIPOS = [<span class="s">'ean13'</span>, <span class="s">'ean8'</span>, <span class="s">'upc_a'</span>] <span class="k">as const</span>;
+
+<span class="f">useEffect</span>(() =&gt; {
+  <span class="k">const</span> sub = AppState.<span class="f">addEventListener</span>(<span class="s">'change'</span>, (e) =&gt; <span class="f">setActiva</span>(e === <span class="s">'active'</span>));
+  <span class="k">return</span> () =&gt; { sub.<span class="f">remove</span>(); bloqueado.current = <span class="k">false</span>; };   <span class="c">// la limpieza</span>
+}, []);</pre>
+</section>
+
+<!-- 8 -->
+<section class="slide" data-tag="7">
+ <span class="badge">Validación</span>
+ <h1 class="t">El dígito verificador filtra la <em>basura</em></h1>
+ <p class="idea">Una etiqueta arrugada o con poca luz produce lecturas corruptas. Validar en
+  memoria cuesta microsegundos y <b>evita una consulta a la base por cada lectura basura</b>.</p>
+ <div class="row c21">
+  <div>
+   <pre><span class="c">// src/lib/gtin.ts · algoritmo módulo 10 de GS1</span>
+<span class="k">export function</span> <span class="f">calcularDigitoVerificador</span>(cuerpo) {
+  <span class="k">if</span> (!<span class="s">/^\d+$/</span>.<span class="f">test</span>(cuerpo)) <span class="k">return null</span>;
+  <span class="c">// El peso depende de la posición DESDE LA DERECHA:</span>
+  <span class="c">// por eso se invierte antes de recorrer.</span>
+  <span class="k">const</span> suma = cuerpo.<span class="f">split</span>(<span class="s">''</span>).<span class="f">map</span>(Number).<span class="f">reverse</span>()
+    .<span class="f">reduce</span>((acc, n, i) =&gt; acc + n * (i % <span class="n">2</span> === <span class="n">0</span> ? <span class="n">3</span> : <span class="n">1</span>), <span class="n">0</span>);
+  <span class="k">return</span> (<span class="n">10</span> - (suma % <span class="n">10</span>)) % <span class="n">10</span>;
+}</pre>
+  </div>
+  <div style="display:grid;gap:10px">
+   <div class="card g"><b class="h">Verificado, no supuesto</b>
+    <p>Probado contra códigos GS1 conocidos antes de usarlo:</p>
+    <p style="font-family:'JetBrains Mono',monospace;font-size:12px;margin-top:5px;line-height:1.7">
+     4006381333931 ✓<br>5012345670003 ✓<br>96385074 ✓<br>036000291452 ✓<br>
+     <span style="color:#e11d48">4006381333932 ✗</span></p></div>
+   <div class="card v"><b class="h">Y de paso, sin duplicados</b>
+    <p>Un UPC-A de 12 dígitos se normaliza a 13 con un cero adelante. El mismo producto no queda
+     cargado dos veces según el simbolismo que se haya leído.</p></div>
+  </div>
+ </div>
+</section>
+
+<!-- 9 -->
+<section class="slide" data-tag="8">
+ <span class="badge">Persistencia</span>
+ <h1 class="t">Dos tablas y una <em>transacción</em></h1>
+ <div class="row c2">
+  <div>
+   <pre><span class="c">-- esquema resumido; el completo está en el Código 2 del informe</span>
+<span class="k">CREATE TABLE</span> productos (
+  codigo  <span class="n">TEXT</span>    <span class="k">PRIMARY KEY</span>,
+  nombre  <span class="n">TEXT</span>    <span class="k">NOT NULL</span>,
+  stock   <span class="n">INTEGER</span> <span class="k">NOT NULL</span> <span class="k">CHECK</span> (stock &gt;= <span class="n">0</span>),
+  minimo  <span class="n">INTEGER</span> <span class="k">NOT NULL</span> <span class="k">DEFAULT</span> <span class="n">5</span>
+);
+
+<span class="k">CREATE TABLE</span> movimientos (
+  id       <span class="n">INTEGER</span> <span class="k">PRIMARY KEY AUTOINCREMENT</span>,
+  codigo   <span class="n">TEXT</span>    <span class="k">REFERENCES</span> productos(codigo),
+  tipo     <span class="n">TEXT</span>    <span class="k">CHECK</span> (tipo <span class="k">IN</span> (<span class="s">'IN'</span>,<span class="s">'OUT'</span>)),
+  cantidad <span class="n">INTEGER</span> <span class="k">CHECK</span> (cantidad &gt; <span class="n">0</span>),
+  fecha    <span class="n">INTEGER</span> <span class="k">NOT NULL</span>
+);</pre>
+  </div>
+  <div style="display:grid;gap:10px">
+   <div class="card"><b class="h">Por qué guardar el stock si existe la bitácora</b>
+    <p>Calcularlo con <code>SUM()</code> es correcto el primer día y cada vez más lento, porque la
+     bitácora crece y nunca se reduce. La columna se lee en tiempo constante.</p></div>
+   <div class="card t"><b class="h">Y cómo evitamos que se desincronicen</b>
+    <p>Leer el stock, actualizarlo e insertar el movimiento van en una sola transacción exclusiva.
+     Sin ella, dos escaneos rápidos leen el mismo stock y se pisan.</p></div>
+   <div class="card r"><b class="h">La última línea de defensa</b>
+    <p><code>CHECK (stock &gt;= 0)</code>. Si la interfaz falla, el motor rechaza la escritura.</p></div>
+   <div class="card s"><b class="h">Inyección SQL</b>
+    <p>Todas las consultas van parametrizadas. <code>execAsync</code> no escapa valores, así que
+     nunca recibe texto escrito por el usuario.</p></div>
+  </div>
+ </div>
+</section>
+
+<!-- 10 -->
+<section class="slide" data-tag="9">
+ <span class="badge">Interfaz</span>
+ <h1 class="t">El color no puede ser el <em>único</em> que avisa</h1>
+ <div class="row c21">
+  <div class="phone">
+   <div class="prow o">
+    <div><div class="pname">Bebida cola 1,5 L</div><div class="pcode">7801234567890</div></div>
+    <div style="text-align:right"><div class="pnum" style="color:#e11d48">0</div>
+     <span class="chip out">✕ AGOTADO</span></div>
+   </div>
+   <div class="prow l">
+    <div><div class="pname">Fideos spaghetti 400 g</div><div class="pcode">7809876543210</div></div>
+    <div style="text-align:right"><div class="pnum" style="color:#f59e0b">4</div>
+     <span class="chip low">! STOCK BAJO</span></div>
+   </div>
+   <div class="prow">
+    <div><div class="pname">Arroz grado 2, 1 kg</div><div class="pcode">7801111222233</div></div>
+    <div style="text-align:right"><div class="pnum" style="color:#16a34a">37</div>
+     <span class="chip ok">✓ EN STOCK</span></div>
+   </div>
+  </div>
+  <div style="display:grid;gap:10px">
+   <div class="card v"><b class="h">Color, texto y símbolo a la vez</b>
+    <p>Cerca del 8% de los hombres tiene alguna forma de daltonismo, y la pantalla se mira bajo la
+     luz de una bodega. Quien no distingue rojo de verde igual lee AGOTADO.</p></div>
+   <div class="card t"><b class="h">Estado derivado, no guardado</b>
+    <p><code>stock &lt;= 0</code> agotado · <code>stock &lt;= minimo</code> bajo · si no, en stock.
+     Una columna extra habría que recalcularla en cada movimiento.</p></div>
+   <div class="card g"><b class="h">Área táctil de 48 dp</b>
+    <p>Sin alturas fijas: con el tamaño de letra del sistema aumentado el botón crece en vez de
+     cortar el texto.</p></div>
+  </div>
+ </div>
+</section>
+
+<!-- 11 -->
+<section class="slide" data-tag="10">
+ <span class="badge">Errores</span>
+ <h1 class="t">Los cuatro estados, y el que <em>casi nadie</em> implementa</h1>
+ <table>
+  <thead><tr><th>Pantalla</th><th>Cargando</th><th>Error</th><th>Vacío</th><th>Con datos</th></tr></thead>
+  <tbody>
+   <tr><td><b>Lista</b></td><td>Abriendo la bodega…</td><td>Mensaje y botón Reintentar</td>
+    <td>La bodega está vacía, con acción Escanear</td><td>Lista ordenada</td></tr>
+   <tr><td><b>Escáner</b></td><td>Revisando el permiso…</td><td>Lectura incompleta, con reintento</td>
+    <td>No aplica</td><td>Cámara activa</td></tr>
+   <tr><td><b>Ficha</b></td><td>Carga de la ficha</td><td>"Solo hay 3 en bodega"</td>
+    <td>Sin movimientos registrados</td><td>Stock e historial</td></tr>
+   <tr><td><b>Alta</b></td><td>Guardando</td><td>Código duplicado o nombre vacío</td>
+    <td>No aplica</td><td>Producto creado</td></tr>
+  </tbody>
+ </table>
+ <div class="row c2" style="margin-top:12px">
+  <div class="card s"><b class="h">El código que no existe no es un error</b>
+   <p>Abre la pantalla de alta con el código ya cargado y bloqueado, y pide nombre, stock inicial y
+    mínimo. Lo que para el usuario sería un error pasa a ser el camino normal para recibir una caja
+    nueva.</p></div>
+  <div class="card r"><b class="h">El vacío que todos olvidan</b>
+   <p>Una lista sin productos que se ve igual que una lista que no cargó confunde por completo.
+    Son pantallas distintas, con texto distinto.</p></div>
+ </div>
+</section>
+
+<!-- 12 -->
+<section class="slide" data-tag="11">
+ <span class="badge">Medición M1</span>
+ <h1 class="t">La decisión se <em>midió</em>, no se supuso</h1>
+ <p class="idea">Buscar un producto por código entre <b>5.000</b>, 30 veces por motor, con un código
+  distinto cada vez. Ejecutado en <b>iPhone físico</b>, con validación cruzada en emulador Android.</p>
+ <div class="row c21">
+  <div style="display:grid;gap:10px">
+   <div>
+    <div style="font-size:13px;font-weight:800;color:#0d63a5;margin-bottom:4px">SQLite · clave primaria</div>
+    <div class="bar" style="background:#16a34a;width:18%">p95 [MEDIR]</div>
+   </div>
+   <div>
+    <div style="font-size:13px;font-weight:800;color:#b45309;margin-bottom:4px">AsyncStorage · arreglo JSON</div>
+    <div class="bar" style="background:#e11d48;width:88%">p95 [MEDIR]</div>
+   </div>
+   <div class="ph">Las barras son ilustrativas. Reemplazar con los números reales de PantallaMedicion
+    en el iPhone físico antes de grabar el video y exportar el informe.</div>
+   <div class="card"><b class="h">Condiciones de la medición</b>
+    <p>Equipo físico: <b>iPhone [modelo]</b>, iOS [versión], Expo Go (SDK 58), tras [N] min de uso
+     continuo. M2 y M3 medidos con <code>performance.now()</code> dentro de la app.</p></div>
+  </div>
+  <div style="display:grid;gap:10px">
+   <div class="card v"><b class="h">Por qué da esa diferencia</b>
+    <p>AsyncStorage guarda pares de clave y valor y no tiene índices: buscar obliga a leer la cadena
+     completa, parsear el JSON y recorrer el arreglo. SQLite resuelve por clave primaria con un
+     recorrido de árbol B.</p></div>
+   <div class="card r"><b class="h">Por qué importa</b>
+    <p>Ese camino se recorre en <b>cada escaneo</b>. Quien recibe un pedido escanea cuarenta cajas
+     seguidas, y la espera se multiplica por cuarenta.</p></div>
+   <div class="card s"><b class="h">Transparencia metodológica</b>
+    <p>El emulador Android solo se usa para validar layout y <code>BackHandler</code>, nunca para
+     tiempos. En iPhone bajo Expo Go ambos motores comparten el mismo hardware y entorno, haciendo
+     comparable la razón relativa.</p></div>
+  </div>
+ </div>
+</section>
+
+<!-- 13 -->
+<section class="slide" data-tag="12">
+ <span class="badge">Cierre</span>
+ <h1 class="t">Lo que aprendimos <em>construyéndola</em></h1>
+ <div class="row c3">
+  <div class="card"><b class="h">1 · El escáner casi no es la cámara</b>
+   <p>Leer el código es una llamada a la biblioteca. El tiempo se fue en el candado, la validación y
+    decidir qué pasa cuando el código no existe. Esa última pregunta cambió el diseño.</p></div>
+  <div class="card t"><b class="h">2 · El permiso no es un trámite</b>
+   <p>Explicación previa, rechazo recuperable, rechazo definitivo con salida a Ajustes y ruta
+    alternativa ocuparon más código que la pantalla de la cámara.</p></div>
+  <div class="card v"><b class="h">3 · Medir cambia el argumento</b>
+   <p>SQLite sobre AsyncStorage se podía defender con teoría. La medición la convierte en un número
+    tomado en el teléfono que va a usar el bodeguero.</p></div>
+ </div>
+ <div class="card s" style="margin-top:14px"><b class="h">Lo que queda abierto</b>
+  <p>La sincronización entre dispositivos, que el local va a pedir apenas tenga dos personas moviendo
+   stock a la vez. Resolverla bien significa decidir qué pasa cuando dos teléfonos sin conexión
+   modifican el mismo producto, y esa pregunta es de arquitectura distribuida más que de desarrollo
+   móvil.</p></div>
+ <p class="note">Walter Olarte · Ulises Estepa · Camilo Arteaga · UTEM 2026 ·
+  Código, informe y video enlazados en la portada del PDF.</p>
+</section>
+
+<div class="hint">← → para navegar · F pantalla completa · P imprimir o guardar en PDF</div>
+</main>
+<footer>Universidad Tecnológica Metropolitana · Desarrollo de Aplicaciones Móviles y Web · Unidad 3 · 2026</footer>
+
+<script>
+(function(){
+ var S=[].slice.call(document.querySelectorAll('.slide')),i=0;
+ var pb=document.getElementById('pb'),cn=document.getElementById('chips');
+ S.forEach(function(s,n){
+  var b=document.createElement('button');
+  b.className='chp'; b.textContent=s.dataset.tag;
+  b.title='Ir a la lámina '+(n+1);
+  b.onclick=function(){go(n);};
+  cn.appendChild(b);
+ });
+ function go(n){ if(n<0||n>=S.length) return; i=n; paint(); }
+ function paint(){
+  S.forEach(function(s,n){ s.classList.toggle('on',n===i); if(n===i) s.scrollTop=0; });
+  pb.style.width=((i+1)/S.length*100)+'%';
+  [].slice.call(cn.children).forEach(function(b,n){ b.classList.toggle('on',n===i); });
+ }
+ document.getElementById('pv').onclick=function(){go(i-1);};
+ document.getElementById('nx').onclick=function(){go(i+1);};
+ document.addEventListener('keydown',function(e){
+  if(e.ctrlKey||e.altKey||e.metaKey) return;
+  var k=e.key;
+  if(k==='ArrowRight'||k==='PageDown'||k===' '){go(i+1);e.preventDefault();}
+  else if(k==='ArrowLeft'||k==='PageUp'){go(i-1);e.preventDefault();}
+  else if(k==='Home'){go(0);e.preventDefault();}
+  else if(k==='End'){go(S.length-1);e.preventDefault();}
+  else if(k==='f'||k==='F'){
+   if(document.fullscreenElement) document.exitFullscreen();
+   else document.documentElement.requestFullscreen();
+   e.preventDefault();
+  }
+  else if(k==='p'||k==='P'){window.print();e.preventDefault();}
+ });
+ paint();
+})();
+</script>
+</body></html>

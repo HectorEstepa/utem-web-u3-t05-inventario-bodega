@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Inventario de bodega",
+    "slug": "inventario-bodega",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "android": {
+      "package": "cl.utem.inventariobodega",
+      "versionCode": 1,
+      "edgeToEdgeEnabled": true
+    },
+    "ios": {
+      "bundleIdentifier": "cl.utem.inventariobodega",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "La app usa la cámara solo para leer el código de barras de los productos. Las imágenes no se guardan ni se envían."
+      }
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "La app usa la cámara solo para leer el código de barras de los productos. Las imágenes no se guardan ni se envían.",
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-sqlite"
+    ]
+  }
+}
