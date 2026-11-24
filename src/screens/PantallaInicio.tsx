@@ -83,10 +83,6 @@ export function PantallaInicio({
           <Text style={[s.saludo, { color: paleta.acento }]}>CONTROL DE BODEGA</Text>
           <Text style={[s.granTitulo, { color: paleta.texto }]}>Inicio</Text>
         </View>
-        <View style={[s.badgeOffline, { backgroundColor: paleta.acentoSuave }]}>
-          <Ionicons name="cloud-offline-outline" size={14} color={paleta.acento} />
-          <Text style={[s.badgeOfflineTxt, { color: paleta.acento }]}>Local</Text>
-        </View>
       </View>
 
       {/* Tarjeta ejecutiva azul claro fino */}

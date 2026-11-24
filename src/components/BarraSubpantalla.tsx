@@ -1,11 +1,13 @@
-import React from 'react';
-import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { TOQUE_MINIMO, useTema } from '../theme';
 
 /**
- * Barra superior estilo iOS Navigation Bar con botón "‹ Volver" de 48 pt
- * siempre accesible, incluso con el teclado numérico abierto, y acción
- * opcional a la derecha (ej. "Ocultar teclado").
+ * Barra superior minimalista con botón "‹ Volver" de 48 pt siempre accesible.
+ * El botón "Listo" (cerrar teclado) se muestra ÚNICAMENTE cuando el teclado
+ * está realmente desplegado, evitando un botón inactivo cuando el teclado ya
+ * está oculto.
  */
 export function BarraSubpantalla({
   titulo,
@@ -21,6 +23,19 @@ export function BarraSubpantalla({
   mostrarCerrarTeclado?: boolean;
 }) {
   const { paleta } = useTema();
+  const [tecladoVisible, setTecladoVisible] = useState(false);
+
+  useEffect(() => {
+    if (!mostrarCerrarTeclado) return;
+    const evShow = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const evHide = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const subShow = Keyboard.addListener(evShow, () => setTecladoVisible(true));
+    const subHide = Keyboard.addListener(evHide, () => setTecladoVisible(false));
+    return () => {
+      subShow.remove();
+      subHide.remove();
+    };
+  }, [mostrarCerrarTeclado]);
 
   return (
     <View
@@ -42,7 +57,7 @@ export function BarraSubpantalla({
         hitSlop={10}
         style={({ pressed }) => [s.btnVolver, pressed && { opacity: 0.6 }]}
       >
-        <Text style={[s.flecha, { color: paleta.acento }]}>‹</Text>
+        <Ionicons name="chevron-back" size={22} color={paleta.acento} />
         <Text style={[s.txtVolver, { color: paleta.acento }]}>{textoVolver}</Text>
       </Pressable>
 
@@ -58,7 +73,7 @@ export function BarraSubpantalla({
       </View>
 
       <View style={s.derecha}>
-        {mostrarCerrarTeclado ? (
+        {mostrarCerrarTeclado && tecladoVisible ? (
           <Pressable
             onPress={() => Keyboard.dismiss()}
             accessibilityRole="button"
@@ -80,7 +95,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   btnVolver: {
@@ -89,13 +104,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    paddingHorizontal: 6,
-  },
-  flecha: {
-    fontSize: 28,
-    fontWeight: '400',
-    lineHeight: 28,
-    marginTop: -2,
+    paddingHorizontal: 4,
   },
   txtVolver: {
     fontSize: 16,
