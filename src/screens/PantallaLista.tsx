@@ -56,14 +56,17 @@ export function PantallaLista({
   const [busqueda, setBusqueda] = useState('');
   const [filtro, setFiltro] = useState<FiltroEstadoLista>('todos');
   const primeraCarga = useRef(true);
+  const ultimaConsulta = useRef(0);
 
   const cargar = useCallback(async () => {
+    const consulta = ++ultimaConsulta.current;
     if (primeraCarga.current) setEstado({ fase: 'cargando' });
     try {
       const [datos, resumen] = await Promise.all([
         listarProductos(db, { filtroEstado: filtro, busqueda }),
         obtenerResumenEjecutivo(db),
       ]);
+      if (consulta !== ultimaConsulta.current) return;
       setEstado({
         fase: 'listo',
         datos,
@@ -74,6 +77,7 @@ export function PantallaLista({
       });
       primeraCarga.current = false;
     } catch (e) {
+      if (consulta !== ultimaConsulta.current) return;
       setEstado({
         fase: 'error',
         mensaje: e instanceof Error ? e.message : 'Error al abrir el inventario',
@@ -83,12 +87,19 @@ export function PantallaLista({
 
   useEffect(() => {
     const t = setTimeout(cargar, busqueda ? 250 : 0);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      ultimaConsulta.current++;
+    };
   }, [cargar, busqueda]);
 
   const cargarDemo = useCallback(async () => {
-    await sembrarCatalogoDemo(db);
-    await cargar();
+    try {
+      await sembrarCatalogoDemo(db);
+      await cargar();
+    } catch (e) {
+      setEstado({ fase: 'error', mensaje: e instanceof Error ? e.message : 'No se pudo cargar el catálogo.' });
+    }
   }, [db, cargar]);
 
   const extraerClave = useCallback((p: Producto) => p.codigo, []);
@@ -232,6 +243,7 @@ const s = StyleSheet.create({
   cabecera: { gap: 12, marginBottom: 14 },
   filaTitulo: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 10,

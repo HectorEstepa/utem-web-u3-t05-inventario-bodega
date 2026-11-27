@@ -1,5 +1,7 @@
+import { TODO_EL_HISTORIAL, validarPeriodo, type Periodo } from '../lib/periodo.ts';
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { validarMovimiento, validarPrecio } from '../lib/stock';
+import { validarMovimiento, validarPrecio } from '../lib/stock.ts';
+import { procesarLectura } from '../lib/gtin.ts';
 
 export interface Producto {
   codigo: string;
@@ -13,8 +15,14 @@ export interface Producto {
 export interface Movimiento {
   id: number;
   codigo: string;
-  tipo: 'IN' | 'OUT';
+  tipo: 'IN' | 'OUT' | 'ADJ';
+  stock_antes?: number | null;
+  stock_despues?: number | null;
   cantidad: number;
+  cantidad_original?: number;
+  entrada_corregida_id?: number | null;
+  entrada_cantidad_antes?: number | null;
+  entrada_cantidad_despues?: number | null;
   precio_unitario: number;
   nota: string;
   fecha: number;
@@ -37,6 +45,8 @@ export interface ResumenEjecutivo {
   salidasUnidades: number;
   salidasMontoCLP: number;
   totalMovimientos: number;
+  primeraFecha: number | null;
+  ultimaFecha: number | null;
   topValorizados: Array<{
     codigo: string;
     nombre: string;
@@ -44,18 +54,6 @@ export interface ResumenEjecutivo {
     precio: number;
     valorTotal: number;
   }>;
-}
-
-export interface PuntoFinanciero {
-  id: number;
-  fecha: number;
-  capitalCLP: number;
-  unidades: number;
-  deltaCLP: number;
-  deltaUnidades: number;
-  tipo: 'IN' | 'OUT';
-  producto: string;
-  nota: string;
 }
 
 export type FiltroEstadoLista = 'todos' | 'bajo' | 'agotado';
@@ -121,8 +119,17 @@ export async function crearProducto(
     precio?: number;
   }
 ): Promise<void> {
-  const { codigo, nombre, stockInicial, minimo, precio = 0 } = datos;
+  const { nombre, stockInicial, minimo, precio = 0 } = datos;
+  const lectura = procesarLectura(datos.codigo);
+  if (!lectura.ok) throw new Error('El código GTIN no es válido. Revisa sus dígitos.');
+  const codigo = lectura.codigo;
   if (!nombre.trim()) throw new Error('El nombre del producto no puede ir vacío.');
+  if (!Number.isInteger(stockInicial) || stockInicial < 0 || stockInicial > 99999) {
+    throw new Error('El stock inicial debe ser un entero entre 0 y 99.999.');
+  }
+  if (!Number.isInteger(minimo) || minimo < 1 || minimo > 99999) {
+    throw new Error('El stock mínimo debe ser un entero entre 1 y 99.999.');
+  }
   const errPrecio = validarPrecio(precio);
   if (errPrecio) throw new Error(errPrecio);
 
@@ -155,50 +162,53 @@ export async function crearProducto(
 
 export async function actualizarProducto(
   db: SQLiteDatabase,
-  datos: { codigo: string; nombre: string; minimo: number; precio: number; stock?: number }
+  datos: { codigo: string; nombre: string; minimo: number; precio: number; stock?: number; stockAnterior?: number; motivo?: string; correccionEntrada?: { id: number; cantidadAnterior: number } }
 ): Promise<void> {
-  const { codigo, nombre, minimo, precio, stock } = datos;
+  const { codigo, nombre, minimo, precio } = datos;
   if (!nombre.trim()) throw new Error('El nombre no puede quedar vacío.');
   if (!Number.isInteger(minimo) || minimo < 1 || minimo > 99999) {
     throw new Error('El stock mínimo debe ser un entero entre 1 y 99.999.');
   }
   const errPrecio = validarPrecio(precio);
   if (errPrecio) throw new Error(errPrecio);
-  if (stock !== undefined && (!Number.isInteger(stock) || stock < 0 || stock > 999999)) {
-    throw new Error('El stock actual debe ser un entero entre 0 y 999.999.');
+
+  if (datos.stock !== undefined && (!Number.isSafeInteger(datos.stock) || datos.stock < 0)) {
+    throw new Error('La cantidad corregida debe ser un entero no negativo y seguro.');
   }
-
   await db.withExclusiveTransactionAsync(async (tx) => {
-    const actual = await tx.getFirstAsync<{ stock: number }>(
-      'SELECT stock FROM productos WHERE codigo = ?',
-      codigo
-    );
-    if (!actual) throw new Error(`El producto ${codigo} ya no existe en la base.`);
-
-    const stockFinal = stock !== undefined ? stock : actual.stock;
-
-    await tx.runAsync(
-      'UPDATE productos SET nombre = ?, minimo = ?, precio = ?, stock = ? WHERE codigo = ?',
-      nombre.trim(),
-      minimo,
-      precio,
-      stockFinal,
-      codigo
-    );
-
-    const diferencia = stockFinal - actual.stock;
-    if (diferencia !== 0) {
-      await tx.runAsync(
-        `INSERT INTO movimientos (codigo, tipo, cantidad, precio_unitario, nota, fecha)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        codigo,
-        diferencia > 0 ? 'IN' : 'OUT',
-        Math.abs(diferencia),
-        precio,
-        'Ajuste directo de stock',
-        Date.now()
-      );
+    const anterior = await buscarPorCodigo(tx as SQLiteDatabase, codigo);
+    if (!anterior) throw new Error('El producto ya no existe.');
+    const stock = datos.stock ?? anterior.stock;
+    if (datos.stock !== undefined && datos.stockAnterior !== anterior.stock) {
+      throw new Error('El stock cambió mientras editabas. Cierra y vuelve a abrir la ficha antes de corregirlo.');
     }
+    const cambiaStock = stock !== anterior.stock;
+    const motivo = datos.motivo?.trim() ?? '';
+    if (cambiaStock && (!motivo || motivo.length > 160)) throw new Error('Indica el motivo del ajuste (1 a 160 caracteres).');
+    let entrada: Movimiento | null = null;
+    let nuevaCantidadEntrada: number | null = null;
+    if (cambiaStock && datos.correccionEntrada) {
+      entrada = await tx.getFirstAsync<Movimiento>(
+        `SELECT ${COLUMNAS_MOVIMIENTO} FROM movimientos m WHERE m.id = ? AND m.codigo = ? AND m.tipo = 'IN'`,
+        datos.correccionEntrada.id, codigo
+      );
+      if (!entrada || entrada.cantidad !== datos.correccionEntrada.cantidadAnterior) {
+        throw new Error('La entrada cambió o ya no existe. Vuelve a seleccionarla antes de corregir.');
+      }
+      nuevaCantidadEntrada = entrada.cantidad + stock - anterior.stock;
+      if (!Number.isSafeInteger(nuevaCantidadEntrada) || nuevaCantidadEntrada < 0) {
+        throw new Error('La corrección dejaría esa entrada con cantidad negativa. Revisa la entrada elegida y el stock correcto.');
+      }
+      await tx.runAsync('UPDATE movimientos SET cantidad_corregida = ? WHERE id = ?', nuevaCantidadEntrada, entrada.id);
+    }
+    await tx.runAsync('UPDATE productos SET nombre = ?, minimo = ?, precio = ?, stock = ? WHERE codigo = ?', nombre.trim(), minimo, precio, stock, codigo);
+    if (cambiaStock) await tx.runAsync(
+      `INSERT INTO movimientos(codigo,tipo,cantidad,precio_unitario,nota,fecha,stock_antes,stock_despues,
+         entrada_corregida_id,entrada_cantidad_antes,entrada_cantidad_despues)
+       VALUES (?, 'ADJ', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      codigo, Math.abs(stock - anterior.stock), entrada?.precio_unitario ?? anterior.precio, motivo, Date.now(), anterior.stock, stock,
+      entrada?.id ?? null, entrada?.cantidad ?? null, nuevaCantidadEntrada
+    );
   });
 }
 
@@ -265,51 +275,81 @@ export async function registrarMovimiento(
   return stockFinal;
 }
 
+/** Cantidad efectiva para consultas; la original se conserva para auditoría. */
+export const CANTIDAD_EFECTIVA = 'COALESCE(m.cantidad_corregida, m.cantidad)';
+export const COLUMNAS_MOVIMIENTO = `m.id,m.codigo,m.tipo,${CANTIDAD_EFECTIVA} AS cantidad,
+  m.cantidad AS cantidad_original,m.precio_unitario,m.nota,m.fecha,m.stock_antes,m.stock_despues,
+  m.entrada_corregida_id,m.entrada_cantidad_antes,m.entrada_cantidad_despues`;
+
 export async function historial(
   db: SQLiteDatabase,
   codigo: string,
   limite = 25
 ): Promise<Movimiento[]> {
   return db.getAllAsync<Movimiento>(
-    'SELECT * FROM movimientos WHERE codigo = ? ORDER BY fecha DESC LIMIT ?',
+    `SELECT ${COLUMNAS_MOVIMIENTO} FROM movimientos m WHERE codigo = ? ORDER BY fecha DESC, id DESC LIMIT ?`,
     codigo,
     limite
   );
 }
 
-export async function listarMovimientosGlobales(
-  db: SQLiteDatabase,
-  opciones: { tipo?: 'TODOS' | 'IN' | 'OUT'; limite?: number } = {}
-): Promise<MovimientoDetallado[]> {
-  const { tipo = 'TODOS', limite = 80 } = opciones;
-  if (tipo === 'IN' || tipo === 'OUT') {
-    return db.getAllAsync<MovimientoDetallado>(
-      `SELECT m.*, COALESCE(p.nombre, m.codigo) AS nombre_producto
-       FROM movimientos m
-       LEFT JOIN productos p ON p.codigo = m.codigo
-       WHERE m.tipo = ?
-       ORDER BY m.fecha DESC
-       LIMIT ?`,
-      tipo,
-      limite
-    );
+export interface OpcionesMovimientos {
+  tipo?: 'TODOS' | 'IN' | 'OUT' | 'ADJ';
+  periodo?: Periodo;
+  codigo?: string;
+  busqueda?: string;
+  limite?: number;
+  antesDe?: { fecha: number; id: number };
+}
+
+/** Filtro compartido por totales, historial y exportaciones; solo valores parametrizados. */
+export function filtroMovimientos(opciones: OpcionesMovimientos = {}) {
+  const { tipo = 'TODOS', periodo = TODO_EL_HISTORIAL, codigo, busqueda = '', antesDe } = opciones;
+  validarPeriodo(periodo);
+  const condiciones: string[] = [];
+  const params: Array<string | number> = [];
+  if (periodo.desde !== null) { condiciones.push('m.fecha >= ?'); params.push(periodo.desde); }
+  if (periodo.hasta !== null) { condiciones.push('m.fecha < ?'); params.push(periodo.hasta); }
+  if (tipo !== 'TODOS') { condiciones.push('m.tipo = ?'); params.push(tipo); }
+  if (codigo) { condiciones.push('m.codigo = ?'); params.push(codigo); }
+  if (busqueda.trim()) {
+    condiciones.push('(p.nombre LIKE ? OR m.codigo LIKE ? OR m.nota LIKE ?)');
+    params.push(...Array(3).fill(`%${busqueda.trim()}%`));
   }
+  if (antesDe) {
+    condiciones.push('(m.fecha < ? OR (m.fecha = ? AND m.id < ?))');
+    params.push(antesDe.fecha, antesDe.fecha, antesDe.id);
+  }
+  return { where: condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '', params };
+}
+
+export async function listarMovimientosGlobales(
+  db: SQLiteDatabase, opciones: OpcionesMovimientos = {}
+): Promise<MovimientoDetallado[]> {
+  const { where, params } = filtroMovimientos(opciones);
+  const limite = opciones.limite ?? 50;
+  if (!Number.isInteger(limite) || limite < 1 || limite > 20000) throw new Error('Límite de consulta inválido.');
   return db.getAllAsync<MovimientoDetallado>(
-    `SELECT m.*, COALESCE(p.nombre, m.codigo) AS nombre_producto
-     FROM movimientos m
-     LEFT JOIN productos p ON p.codigo = m.codigo
-     ORDER BY m.fecha DESC
-     LIMIT ?`,
-    limite
+    `SELECT ${COLUMNAS_MOVIMIENTO}, COALESCE(p.nombre, m.codigo) AS nombre_producto
+     FROM movimientos m LEFT JOIN productos p ON p.codigo = m.codigo
+     ${where} ORDER BY m.fecha DESC, m.id DESC LIMIT ?`, ...params, limite
   );
 }
 
+export async function contarMovimientos(db: SQLiteDatabase, opciones: OpcionesMovimientos = {}): Promise<number> {
+  const { where, params } = filtroMovimientos({ ...opciones, antesDe: undefined });
+  const fila = await db.getFirstAsync<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM movimientos m LEFT JOIN productos p ON p.codigo = m.codigo ${where}`, ...params
+  );
+  return fila?.n ?? 0;
+}
+
 /**
- * Calcula en dos agregaciones SQL nativas todas las métricas del Dashboard
- * Ejecutivo y Técnico en < 10 ms sobre miles de filas, sin cargar arreglos
- * gigantes en la memoria de JavaScript.
+ * Calcula las métricas con dos agregaciones y una consulta de los cinco
+ * productos de mayor valor. Su duración debe medirse en el dispositivo.
  */
-export async function obtenerResumenEjecutivo(db: SQLiteDatabase): Promise<ResumenEjecutivo> {
+export async function obtenerResumenEjecutivo(db: SQLiteDatabase, periodo: Periodo = TODO_EL_HISTORIAL): Promise<ResumenEjecutivo> {
+  const { where, params } = filtroMovimientos({ periodo });
   const [aggProd, aggMov, top] = await Promise.all([
     db.getFirstAsync<{
       totalSkus: number;
@@ -330,6 +370,8 @@ export async function obtenerResumenEjecutivo(db: SQLiteDatabase): Promise<Resum
     `),
     db.getFirstAsync<{
       totalMovimientos: number;
+      primeraFecha: number | null;
+      ultimaFecha: number | null;
       entradasUnidades: number;
       entradasMontoCLP: number;
       salidasUnidades: number;
@@ -337,12 +379,14 @@ export async function obtenerResumenEjecutivo(db: SQLiteDatabase): Promise<Resum
     }>(`
       SELECT
         COUNT(*) AS totalMovimientos,
-        COALESCE(SUM(CASE WHEN tipo = 'IN' THEN cantidad ELSE 0 END), 0) AS entradasUnidades,
-        COALESCE(SUM(CASE WHEN tipo = 'IN' THEN cantidad * precio_unitario ELSE 0 END), 0) AS entradasMontoCLP,
-        COALESCE(SUM(CASE WHEN tipo = 'OUT' THEN cantidad ELSE 0 END), 0) AS salidasUnidades,
-        COALESCE(SUM(CASE WHEN tipo = 'OUT' THEN cantidad * precio_unitario ELSE 0 END), 0) AS salidasMontoCLP
-      FROM movimientos
-    `),
+        MIN(fecha) AS primeraFecha,
+        MAX(fecha) AS ultimaFecha,
+        COALESCE(SUM(CASE WHEN tipo = 'IN' THEN ${CANTIDAD_EFECTIVA} ELSE 0 END), 0) AS entradasUnidades,
+        COALESCE(SUM(CASE WHEN tipo = 'IN' THEN ${CANTIDAD_EFECTIVA} * precio_unitario ELSE 0 END), 0) AS entradasMontoCLP,
+        COALESCE(SUM(CASE WHEN tipo = 'OUT' THEN ${CANTIDAD_EFECTIVA} ELSE 0 END), 0) AS salidasUnidades,
+        COALESCE(SUM(CASE WHEN tipo = 'OUT' THEN ${CANTIDAD_EFECTIVA} * precio_unitario ELSE 0 END), 0) AS salidasMontoCLP
+      FROM movimientos m ${where}
+    `, ...params),
     db.getAllAsync<{
       codigo: string;
       nombre: string;
@@ -378,70 +422,14 @@ export async function obtenerResumenEjecutivo(db: SQLiteDatabase): Promise<Resum
     salidasUnidades: aggMov?.salidasUnidades ?? 0,
     salidasMontoCLP: aggMov?.salidasMontoCLP ?? 0,
     totalMovimientos: aggMov?.totalMovimientos ?? 0,
+    primeraFecha: aggMov?.primeraFecha ?? null,
+    ultimaFecha: aggMov?.ultimaFecha ?? null,
     topValorizados: top,
   };
 }
 
 /**
- * Construye la serie cronológica acumulada de capital ($ CLP) y unidades
- * físicas en bodega a partir del libro de movimientos para el gráfico
- * financiero interactivo del Dashboard.
- */
-export async function obtenerSerieFinanciera(
-  db: SQLiteDatabase,
-  limite = 60
-): Promise<PuntoFinanciero[]> {
-  const filas = await db.getAllAsync<{
-    id: number;
-    fecha: number;
-    tipo: 'IN' | 'OUT';
-    cantidad: number;
-    precio_unitario: number;
-    nota: string;
-    producto: string;
-  }>(`
-    SELECT
-      m.id,
-      m.fecha,
-      m.tipo,
-      m.cantidad,
-      m.precio_unitario,
-      m.nota,
-      COALESCE(p.nombre, m.codigo) AS producto
-    FROM movimientos m
-    LEFT JOIN productos p ON p.codigo = m.codigo
-    ORDER BY m.fecha ASC, m.id ASC
-  `);
-
-  let capitalAcum = 0;
-  let unidadesAcum = 0;
-  const serie: PuntoFinanciero[] = [];
-
-  for (const f of filas) {
-    const monto = f.cantidad * (f.precio_unitario ?? 0);
-    const deltaCLP = f.tipo === 'IN' ? monto : -monto;
-    const deltaUnidades = f.tipo === 'IN' ? f.cantidad : -f.cantidad;
-    capitalAcum = Math.max(0, capitalAcum + deltaCLP);
-    unidadesAcum = Math.max(0, unidadesAcum + deltaUnidades);
-
-    serie.push({
-      id: f.id,
-      fecha: f.fecha,
-      capitalCLP: capitalAcum,
-      unidades: unidadesAcum,
-      deltaCLP,
-      deltaUnidades,
-      tipo: f.tipo,
-      producto: f.producto,
-      nota: f.nota || (f.tipo === 'IN' ? 'Entrada de stock' : 'Salida / despacho'),
-    });
-  }
-
-  return serie.length > limite ? serie.slice(serie.length - limite) : serie;
-}
-
-/**
- * Carga un lote realista de abarrotes chilenos con GTIN-13 válidos cuando la
+ * Carga un lote ficticio con códigos de dígito verificador válido cuando la
  * bodega está vacía y el usuario desea probar el dashboard y la exportación
  * inmediatamente.
  */
@@ -457,8 +445,8 @@ export async function sembrarCatalogoDemo(db: SQLiteDatabase): Promise<void> {
     { codigo: '4006381333931', nombre: 'Destacador Escolar Amarillo', stock: 24, minimo: 6, precio: 1290, salidasDemo: 8 },
     { codigo: '5012345670003', nombre: 'Café Tostado Molido 250 g', stock: 3, minimo: 5, precio: 4890, salidasDemo: 9 },
     { codigo: '0036000291452', nombre: 'Pañuelos Desechables Pack x6', stock: 0, minimo: 4, precio: 2190, salidasDemo: 6 },
-    { codigo: '7801610001625', nombre: 'Bebida Cola Retornable 2 L', stock: 18, minimo: 8, precio: 1950, salidasDemo: 12 },
-    { codigo: '7802900001015', nombre: 'Arroz Grado 1 Selección 1 kg', stock: 4, minimo: 6, precio: 1690, salidasDemo: 10 },
+    { codigo: '7801610001622', nombre: 'Bebida Cola Retornable 2 L', stock: 18, minimo: 8, precio: 1950, salidasDemo: 12 },
+    { codigo: '7802900001018', nombre: 'Arroz Grado 1 Selección 1 kg', stock: 4, minimo: 6, precio: 1690, salidasDemo: 10 },
   ];
 
   await db.withExclusiveTransactionAsync(async (tx) => {

@@ -32,6 +32,8 @@ export interface Paleta {
   ambarSuave: string;
   rojo: string;
   rojoSuave: string;
+  salida: string;
+  salidaSuave: string;
   chipTexto: string;
 }
 
@@ -57,6 +59,8 @@ const PALETA_CLARA: Paleta = {
   ambarSuave: '#FEF3C7',
   rojo: '#DC2626',
   rojoSuave: '#FEE2E2',
+  salida: '#6D28D9',
+  salidaSuave: '#EDE9FE',
   chipTexto: '#FFFFFF',
 };
 
@@ -82,6 +86,8 @@ const PALETA_OSCURA: Paleta = {
   ambarSuave: 'rgba(251,191,36,0.18)',
   rojo: '#F87171',
   rojoSuave: 'rgba(248,113,113,0.18)',
+  salida: '#C4B5FD',
+  salidaSuave: 'rgba(196,181,253,0.16)',
   chipTexto: '#FFFFFF',
 };
 
@@ -138,7 +144,7 @@ export function coloresEstado(p: Paleta) {
 }
 
 export const TOQUE_MINIMO = 48;
-export const VERSION_APP = '1.3.0';
+export const VERSION_APP = '1.6.0';
 
 const CLAVE_PREFS = 'prefs_ui_v1';
 

@@ -26,6 +26,8 @@ export function PantallaEscaner({ onLeido, onCancelar, onManual }: Props) {
   const [codigoInvalido, setCodigoInvalido] = useState<string | null>(null);
   const [linterna, setLinterna] = useState(false);
   const [activa, setActiva] = useState(true);
+  const [errorCamara, setErrorCamara] = useState<string | null>(null);
+  const [sesionCamara, setSesionCamara] = useState(0);
 
   const bloqueado = useRef(false);
 
@@ -34,7 +36,7 @@ export function PantallaEscaner({ onLeido, onCancelar, onManual }: Props) {
       const enFrente = e === 'active';
       setActiva(enFrente);
       if (!enFrente) setLinterna(false);
-      if (enFrente) consultarPermiso();
+      if (enFrente) consultarPermiso().catch(() => setErrorCamara('No se pudo consultar el permiso de cámara.'));
     });
     return () => {
       sub.remove();
@@ -63,6 +65,30 @@ export function PantallaEscaner({ onLeido, onCancelar, onManual }: Props) {
     bloqueado.current = false;
   }, []);
 
+  const solicitarPermiso = async () => {
+    try {
+      setExplicado(true);
+      await pedirPermiso();
+    } catch {
+      setErrorCamara('No se pudo solicitar acceso a la cámara. Puedes ingresar el código manualmente.');
+    }
+  };
+
+  if (errorCamara) {
+    return (
+      <View style={[s.centro, { backgroundColor: paleta.fondo }]}>
+        <Text style={[s.parrafo, { color: paleta.texto }]}>{errorCamara}</Text>
+        <Boton titulo="Reintentar cámara" onPress={() => {
+          setErrorCamara(null);
+          setSesionCamara((n) => n + 1);
+          bloqueado.current = false;
+        }} />
+        <Boton titulo="Ingresar código manualmente" onPress={onManual} estilo="secundario" />
+        <Boton titulo="Volver" onPress={onCancelar} estilo="fantasma" />
+      </View>
+    );
+  }
+
   // 1. Consultando estado inicial del permiso.
   if (!permiso) return <Cargando texto="Verificando acceso a la cámara…" />;
 
@@ -89,10 +115,7 @@ export function PantallaEscaner({ onLeido, onCancelar, onManual }: Props) {
           </Text>
           <Boton
             titulo="Continuar y permitir cámara"
-            onPress={async () => {
-              setExplicado(true);
-              await pedirPermiso();
-            }}
+            onPress={solicitarPermiso}
           />
           <Boton titulo="Ingresar código manualmente" onPress={onManual} estilo="secundario" />
           <Boton titulo="Volver al inventario" onPress={onCancelar} estilo="fantasma" compacto />
@@ -121,7 +144,7 @@ export function PantallaEscaner({ onLeido, onCancelar, onManual }: Props) {
               : 'El permiso fue deshabilitado en el sistema. Puedes activarlo en Ajustes o continuar trabajando con ingreso manual.'}
           </Text>
           {permiso.canAskAgain ? (
-            <Boton titulo="Solicitar permiso nuevamente" onPress={() => pedirPermiso()} />
+            <Boton titulo="Solicitar permiso nuevamente" onPress={solicitarPermiso} />
           ) : (
             <Boton titulo="Abrir Ajustes del sistema" onPress={() => Linking.openSettings()} />
           )}
@@ -163,11 +186,13 @@ export function PantallaEscaner({ onLeido, onCancelar, onManual }: Props) {
     <View style={s.raiz}>
       {activa ? (
         <CameraView
+          key={sesionCamara}
           style={StyleSheet.absoluteFill}
           facing="back"
           enableTorch={linterna}
           barcodeScannerSettings={{ barcodeTypes: [...TIPOS] }}
           onBarcodeScanned={alEscanear}
+          onMountError={({ message }) => setErrorCamara(`No se pudo iniciar la cámara: ${message}`)}
         />
       ) : (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
