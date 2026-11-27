@@ -1,4 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { ResumenFlujos } from '../components/ResumenFlujos';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { GraficoEvolucion } from '../components/GraficoEvolucion';
+import { obtenerEvolucion, type Evolucion } from '../db/evolucion';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Boton } from '../components/Boton';
@@ -12,28 +15,36 @@ import {
   type ResumenEjecutivo,
 } from '../db/inventario';
 import { exportarReporteExcel } from '../lib/exportarExcel';
+import { formatearFechaHoraSlash } from '../lib/periodo';
 import { formatearCLP } from '../lib/stock';
+import { SelectorPeriodo } from '../components/SelectorPeriodo';
+import { FilaMovimiento } from '../components/FilaMovimiento';
+import { usePeriodo } from '../periodo';
 import { useTema } from '../theme';
 
-type FiltroMov = 'TODOS' | 'OUT' | 'IN';
+type FiltroMov = 'TODOS' | 'OUT' | 'IN' | 'ADJ';
 
 /**
  * Dashboard Ejecutivo y Técnico:
- * - Valorización del capital actual en bodega ($ CLP), ingresos acumulados
- *   (recepción) y salidas acumuladas (despachos / ventas).
+ * - Stock actual separado de entradas/salidas del período compartido.
  * - Distribución visual de salud del stock (Óptimo / Stock bajo / Agotado).
  * - Top 5 productos por capital inmovilizado con barras proporcionales.
  * - Bitácora global filtrable de entradas y salidas.
- * - Exportación directa de libro Excel (.xlsx de 3 hojas) mediante menú nativo.
+ * - Historial paginado y exportación de cinco hojas del período.
  */
 export function PantallaDashboard({
+  onHistorial,
   onAbrirCodigo,
   onIrAEscanear,
 }: {
+  onHistorial: () => void;
   onAbrirCodigo: (codigo: string) => void;
   onIrAEscanear: () => void;
 }) {
   const db = useSQLiteContext();
+  const { periodo } = usePeriodo();
+  const [evolucion, setEvolucion] = useState<Evolucion>({ puntos: [], agrupacion: 'día' });
+  const [actualizado, setActualizado] = useState(() => new Date());
   const { paleta } = useTema();
   const [resumen, setResumen] = useState<ResumenEjecutivo | null>(null);
   const [movimientos, setMovimientos] = useState<MovimientoDetallado[]>([]);
@@ -43,24 +54,33 @@ export function PantallaDashboard({
   const [exportando, setExportando] = useState(false);
   const [mensajeExport, setMensajeExport] = useState<string | null>(null);
 
+  const ultimaConsulta = useRef(0);
   const cargar = useCallback(async () => {
+    const consulta = ++ultimaConsulta.current;
+    setCargando(true);
     try {
       setError(null);
-      const [res, movs] = await Promise.all([
-        obtenerResumenEjecutivo(db),
-        listarMovimientosGlobales(db, { tipo: filtroMov, limite: 40 }),
+      const [res, movs, serie] = await Promise.all([
+        obtenerResumenEjecutivo(db, periodo),
+        listarMovimientosGlobales(db, { tipo: filtroMov, periodo, limite: 5 }),
+        obtenerEvolucion(db, periodo),
       ]);
+      if (consulta !== ultimaConsulta.current) return;
       setResumen(res);
+      setEvolucion(serie);
+      setActualizado(new Date());
       setMovimientos(movs);
     } catch (e) {
+      if (consulta !== ultimaConsulta.current) return;
       setError(e instanceof Error ? e.message : 'Error al cargar las métricas ejecutivas.');
     } finally {
-      setCargando(false);
+      if (consulta === ultimaConsulta.current) setCargando(false);
     }
-  }, [db, filtroMov]);
+  }, [db, filtroMov, periodo]);
 
   useEffect(() => {
     cargar();
+    return () => { ultimaConsulta.current++; };
   }, [cargar]);
 
   const exportar = async () => {
@@ -68,7 +88,7 @@ export function PantallaDashboard({
     setExportando(true);
     setMensajeExport(null);
     try {
-      const nombre = await exportarReporteExcel(db);
+      const nombre = await exportarReporteExcel(db, periodo);
       setMensajeExport(`Reporte generado: ${nombre}`);
     } catch (e) {
       setMensajeExport(e instanceof Error ? e.message : 'No se pudo exportar el archivo Excel.');
@@ -79,8 +99,8 @@ export function PantallaDashboard({
 
   const cargarDemo = async () => {
     setCargando(true);
-    await sembrarCatalogoDemo(db);
-    await cargar();
+    try { await sembrarCatalogoDemo(db); await cargar(); }
+    catch (e) { setError(e instanceof Error ? e.message : 'No se pudo cargar el catálogo.'); setCargando(false); }
   };
 
   if (cargando) return <Cargando texto="Calculando métricas de bodega…" />;
@@ -104,7 +124,7 @@ export function PantallaDashboard({
         <View style={{ flex: 1 }}>
           <Text style={[s.granTitulo, { color: paleta.texto }]}>Dashboard</Text>
           <Text style={[s.subtitulo, { color: paleta.textoSecundario }]}>
-            Analítica financiera y control de stock
+            Stock actual y movimientos por período
           </Text>
         </View>
         <Pressable
@@ -121,6 +141,19 @@ export function PantallaDashboard({
           <Text style={s.txtExcel}>{exportando ? 'Generando…' : 'Exportar .xlsx'}</Text>
         </Pressable>
       </View>
+
+      <View style={{ gap: 10 }}>
+        <Text style={{ color: paleta.texto, fontSize: 20, fontWeight: '800' }}>Movimientos del período</Text>
+        <SelectorPeriodo />
+        <ResumenFlujos resumen={resumen} />
+        <GraficoEvolucion key={periodo.detalle} datos={evolucion} />
+      </View>
+      {periodo.desde === null && resumen.primeraFecha !== null && resumen.ultimaFecha !== null ? (
+        <Text style={{ color: paleta.textoSecundario }}>
+          Registros incluidos: {formatearFechaHoraSlash(resumen.primeraFecha)} al{' '}
+          {formatearFechaHoraSlash(resumen.ultimaFecha)}
+        </Text>
+      ) : null}
 
       {mensajeExport ? (
         <View style={[s.avisoBanner, { backgroundColor: paleta.acentoSuave }]}>
@@ -152,7 +185,7 @@ export function PantallaDashboard({
             ]}
           >
             <Text style={[s.kicker, { color: paleta.textoTerciario }]}>
-              VALORIZACIÓN ACTUAL EN BODEGA
+              STOCK ACTUAL · NO HISTÓRICO
             </Text>
             <Text style={[s.heroMonto, { color: paleta.texto }]}>
               {formatearCLP(resumen.valorInventarioCLP)}
@@ -176,42 +209,9 @@ export function PantallaDashboard({
             </View>
           </View>
 
-          {/* KPIs de Flujo: Salidas/Ventas vs Entradas/Compras */}
-          <View style={s.gridDos}>
-            <View
-              style={[
-                s.kpiCard,
-                { backgroundColor: paleta.superficie, borderColor: paleta.borde },
-              ]}
-            >
-              <Text style={[s.kpiLabel, { color: paleta.textoTerciario }]}>
-                SALIDAS / DESPACHOS
-              </Text>
-              <Text style={[s.kpiValor, { color: paleta.rojo }]}>
-                {formatearCLP(resumen.salidasMontoCLP)}
-              </Text>
-              <Text style={[s.kpiMeta, { color: paleta.textoSecundario }]}>
-                ▼ {resumen.salidasUnidades.toLocaleString('es-CL')} unidades despachadas
-              </Text>
-            </View>
-
-            <View
-              style={[
-                s.kpiCard,
-                { backgroundColor: paleta.superficie, borderColor: paleta.borde },
-              ]}
-            >
-              <Text style={[s.kpiLabel, { color: paleta.textoTerciario }]}>
-                ENTRADAS / RECEPCIÓN
-              </Text>
-              <Text style={[s.kpiValor, { color: paleta.verde }]}>
-                {formatearCLP(resumen.entradasMontoCLP)}
-              </Text>
-              <Text style={[s.kpiMeta, { color: paleta.textoSecundario }]}>
-                ▲ {resumen.entradasUnidades.toLocaleString('es-CL')} unidades ingresadas
-              </Text>
-            </View>
-          </View>
+          <Text style={{ color: paleta.textoSecundario }}>
+            Stock actualizado {formatearFechaHoraSlash(actualizado)}. Flujos: {periodo.detalle}.
+          </Text>
 
           {/* Distribución de Salud de Stock */}
           <View
@@ -299,7 +299,7 @@ export function PantallaDashboard({
             ]}
           >
             <Text style={[s.kicker, { color: paleta.textoSecundario }]}>
-              MOVIMIENTOS RECIENTES ({resumen.totalMovimientos} TOTALES)
+              VISTA PREVIA · HASTA 5 MOVIMIENTOS DEL PERÍODO
             </Text>
 
             <SelectorSegmentado<FiltroMov>
@@ -307,8 +307,9 @@ export function PantallaDashboard({
               onChange={setFiltroMov}
               opciones={[
                 { valor: 'TODOS', etiqueta: 'Todos' },
-                { valor: 'OUT', etiqueta: 'Salidas / Ventas' },
+                { valor: 'OUT', etiqueta: 'Salidas' },
                 { valor: 'IN', etiqueta: 'Entradas' },
+                { valor: 'ADJ', etiqueta: 'Ajustes' },
               ]}
             />
 
@@ -317,70 +318,12 @@ export function PantallaDashboard({
                 No hay movimientos para el filtro seleccionado.
               </Text>
             ) : (
-              movimientos.map((m, idx) => {
-                const esEntrada = m.tipo === 'IN';
-                const subtotal = m.cantidad * (m.precio_unitario ?? 0);
-                return (
-                  <Pressable
-                    key={m.id}
-                    onPress={() => onAbrirCodigo(m.codigo)}
-                    style={[
-                      s.movFila,
-                      idx > 0 && {
-                        borderTopWidth: StyleSheet.hairlineWidth,
-                        borderTopColor: paleta.separador,
-                      },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        s.iconoMov,
-                        {
-                          backgroundColor: esEntrada ? paleta.verdeSuave : paleta.rojoSuave,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={{
-                          color: esEntrada ? paleta.verde : paleta.rojo,
-                          fontWeight: '800',
-                          fontSize: 13,
-                        }}
-                      >
-                        {esEntrada ? '▲' : '▼'}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.movProd, { color: paleta.texto }]} numberOfLines={1}>
-                        {m.nombre_producto}
-                      </Text>
-                      <Text style={[s.movSub, { color: paleta.textoTerciario }]}>
-                        {esEntrada ? 'Entrada' : 'Salida'} {m.cantidad} u.
-                        {m.nota ? ` · ${m.nota}` : ''} ·{' '}
-                        {new Date(m.fecha).toLocaleString('es-CL', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </Text>
-                    </View>
-                    <Text
-                      style={[
-                        s.movDinero,
-                        { color: esEntrada ? paleta.verde : paleta.rojo },
-                      ]}
-                    >
-                      {esEntrada ? '+' : '−'}
-                      {formatearCLP(subtotal)}
-                    </Text>
-                  </Pressable>
-                );
-              })
+              movimientos.map((m) => <FilaMovimiento key={m.id} movimiento={m} onPress={onAbrirCodigo} />)
             )}
 
+            <Boton titulo="Abrir historial y buscar movimientos" onPress={onHistorial} estilo="secundario" />
             <Boton
-              titulo={exportando ? 'Exportando…' : '⤓ Exportar libro Excel completo (.xlsx)'}
+              titulo={exportando ? 'Exportando…' : '⤓ Exportar reporte del período (.xlsx)'}
               onPress={exportar}
               estilo="secundario"
               deshabilitado={exportando}

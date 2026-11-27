@@ -70,8 +70,8 @@ async function sembrarAsyncStorage(): Promise<void> {
 export async function medirSQLite(db: SQLiteDatabase): Promise<ResultadoBench> {
   const t: number[] = [];
   for (let r = 0; r < REPETICIONES; r++) {
-    // Un código distinto en cada repetición: buscar siempre el mismo
-    // mediría la caché de páginas de SQLite, no la búsqueda.
+    // Un código distinto por repetición. Aun así, el motor puede reutilizar
+    // páginas en caché; esta es una medición con calentamiento, no de disco frío.
     const objetivo = codigoSintetico(Math.floor((r * 997) % N_PRODUCTOS));
     const t0 = performance.now();
     await db.getFirstAsync('SELECT * FROM bench_productos WHERE codigo = ?', objetivo);
@@ -102,16 +102,20 @@ export async function medirAsyncStorage(): Promise<ResultadoBench> {
 }
 
 export async function correrMedicion(db: SQLiteDatabase): Promise<ResultadoBench[]> {
-  await sembrarSQLite(db);
-  await sembrarAsyncStorage();
-  // Una pasada en vacío antes de medir: la primera consulta paga la apertura
-  // de la base y el calentamiento del motor de JavaScript.
-  await db.getFirstAsync('SELECT * FROM bench_productos LIMIT 1');
-  await AsyncStorage.getItem(CLAVE_AS);
+  try {
+    await sembrarSQLite(db);
+    await sembrarAsyncStorage();
+    // Una pasada en vacío antes de medir: la primera consulta paga la apertura
+    // de la base y el calentamiento del motor de JavaScript.
+    await db.getFirstAsync('SELECT * FROM bench_productos LIMIT 1');
+    await AsyncStorage.getItem(CLAVE_AS);
 
-  const sqlite = await medirSQLite(db);
-  const asyncS = await medirAsyncStorage();
-  return [sqlite, asyncS];
+    const sqlite = await medirSQLite(db);
+    const asyncS = await medirAsyncStorage();
+    return [sqlite, asyncS];
+  } finally {
+    await limpiarMedicion(db);
+  }
 }
 
 export async function limpiarMedicion(db: SQLiteDatabase): Promise<void> {

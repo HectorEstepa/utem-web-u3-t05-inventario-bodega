@@ -37,9 +37,16 @@ export function validarMovimiento(
   cantidad: number,
   stockActual: number
 ): string | null {
+  if (tipo !== 'IN' && tipo !== 'OUT') return 'El tipo de movimiento no es válido.';
+  if (!Number.isSafeInteger(stockActual) || stockActual < 0) {
+    return 'El saldo actual no es válido.';
+  }
   if (!Number.isInteger(cantidad)) return 'La cantidad debe ser un número entero.';
   if (cantidad <= 0) return 'La cantidad debe ser mayor que cero.';
   if (cantidad > 99999) return 'La cantidad supera el máximo permitido (99.999).';
+  if (tipo === 'IN' && !Number.isSafeInteger(stockActual + cantidad)) {
+    return 'La entrada supera el saldo máximo que se puede representar con exactitud.';
+  }
   if (tipo === 'OUT' && cantidad > stockActual) {
     return `No puedes despachar ${cantidad}: solo hay ${stockActual} en bodega.`;
   }

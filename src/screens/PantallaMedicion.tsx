@@ -6,7 +6,6 @@ import { Boton } from '../components/Boton';
 import { Cargando } from '../components/Estados';
 import {
   correrMedicion,
-  limpiarMedicion,
   N_PRODUCTOS,
   type ResultadoBench,
 } from '../bench/medicion';
@@ -31,6 +30,7 @@ export function PantallaMedicion({
   const [msg, setMsg] = useState('');
 
   const correr = async () => {
+    if (fase === 'corriendo') return;
     setFase('corriendo');
     try {
       setRes(await correrMedicion(db));
@@ -78,8 +78,8 @@ export function PantallaMedicion({
           {__DEV__ ? (
             <View style={[s.aviso, { backgroundColor: paleta.ambarSuave }]}>
               <Text style={[s.avisoTxt, { color: paleta.ambar }]}>
-                En Expo Go (__DEV__) ambos motores comparten el mismo hardware real y sobrecarga JS,
-                por lo que la razón relativa entre SQLite y AsyncStorage es reproducible.
+                El modo desarrollo agrega sobrecarga y puede alterar la comparación. Registra el
+                dispositivo y el entorno; repite las mediciones y prefiere un binario release.
               </Text>
             </View>
           ) : null}
@@ -95,7 +95,7 @@ export function PantallaMedicion({
             TELEMETRÍA DE LA SESIÓN ACTUAL
           </Text>
           <View style={s.filaDato}>
-            <Text style={[s.lblDato, { color: paleta.texto }]}>M3 · Arranque hasta UI lista</Text>
+            <Text style={[s.lblDato, { color: paleta.texto }]}>M3 · Inicio JS hasta contenedor</Text>
             <Text style={[s.valDato, { color: paleta.acento }]}>
               {arranqueMs !== null ? `${arranqueMs.toFixed(1)} ms` : '—'}
             </Text>
@@ -107,12 +107,17 @@ export function PantallaMedicion({
             ]}
           >
             <Text style={[s.lblDato, { color: paleta.texto }]}>
-              M2 · Consulta tras escaneo ({muestrasM2.length} muestras)
+              M2 · Consulta por código ({muestrasM2.length} muestras)
             </Text>
             <Text style={[s.valDato, { color: paleta.acento }]}>
               {promedioM2 !== null ? `${promedioM2.toFixed(2)} ms` : 'Escanea primero'}
             </Text>
           </View>
+          <Text style={[s.parrafo, { color: paleta.textoSecundario }]}>
+            M2 incluye consultas por cámara o ingreso manual, sin el tiempo de reconocimiento ni
+            renderizado. M3 empieza al evaluar App.tsx: excluye el inicio nativo y no asegura que
+            los datos de Inicio estén listos. Estos valores pertenecen solo a esta sesión.
+          </Text>
         </View>
 
         <View
@@ -182,13 +187,10 @@ export function PantallaMedicion({
             titulo={fase === 'listo' ? 'Repetir prueba M1' : 'Ejecutar prueba M1 (5.000 SKUs)'}
             onPress={correr}
           />
-          {fase === 'listo' ? (
-            <Boton
-              titulo="Limpiar tabla temporal de prueba"
-              onPress={() => limpiarMedicion(db).then(() => setFase('inicio'))}
-              estilo="secundario"
-            />
-          ) : null}
+          <Text style={[s.parrafo, { color: paleta.textoSecundario }]}>
+            Resultados en milisegundos. Los datos sintéticos de M1 se eliminan al terminar;
+            no modifican el inventario. AsyncStorage se compara como arreglo JSON, sin caché propia.
+          </Text>
         </View>
       </ScrollView>
     </View>

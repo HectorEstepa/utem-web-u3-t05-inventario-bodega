@@ -1,17 +1,19 @@
-import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
   Keyboard,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite';
+import { SQLiteProvider, useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
+import { ProveedorPeriodo } from './src/periodo';
+import { PantallaHistorial } from './src/screens/PantallaHistorial';
 import { migrar } from './src/db/schema';
 import { buscarPorCodigo, type Producto } from './src/db/inventario';
 import { Cargando, ErrorEstado } from './src/components/Estados';
@@ -33,9 +35,10 @@ type Pestana = 'inicio' | 'inventario' | 'escaner' | 'dashboard' | 'ajustes';
 type Subvista =
   | { tipo: 'ninguna' }
   | { tipo: 'manual' }
-  | { tipo: 'producto'; codigo: string }
+  | { tipo: 'producto'; codigo: string; origenHistorial?: { codigo?: string } }
   | { tipo: 'alta'; codigo: string }
-  | { tipo: 'medicion' };
+  | { tipo: 'medicion' }
+  | { tipo: 'historial'; codigo?: string };
 
 type NombreIcono = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -81,6 +84,14 @@ function ContenedorPrincipal() {
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (subvista.tipo === 'producto' && subvista.origenHistorial) {
+        setSubvista({ tipo: 'historial', codigo: subvista.origenHistorial.codigo });
+        return true;
+      }
+      if (subvista.tipo === 'historial' && subvista.codigo) {
+        setSubvista({ tipo: 'producto', codigo: subvista.codigo });
+        return true;
+      }
       if (subvista.tipo !== 'ninguna') {
         cerrarSubvista();
         return true;
@@ -121,10 +132,16 @@ function ContenedorPrincipal() {
       <StatusBar style={paleta.oscura ? 'light' : 'dark'} />
 
       <View style={s.contenido}>
-        {subvista.tipo === 'manual' ? (
+        {subvista.tipo === 'historial' ? (
+          <PantallaHistorial codigo={subvista.codigo}
+            onVolver={() => subvista.codigo ? setSubvista({ tipo: 'producto', codigo: subvista.codigo }) : cerrarSubvista()}
+            onAbrirCodigo={(codigo) => setSubvista({ tipo: 'producto', codigo, origenHistorial: { codigo: subvista.codigo } })} />
+        ) : subvista.tipo === 'manual' ? (
           <PantallaManual onConfirmar={resolverCodigo} onCancelar={cerrarSubvista} />
         ) : subvista.tipo === 'producto' ? (
-          <PantallaProducto codigo={subvista.codigo} onVolver={cerrarSubvista} />
+          <PantallaProducto codigo={subvista.codigo}
+            onVolver={() => subvista.origenHistorial ? setSubvista({ tipo: 'historial', codigo: subvista.origenHistorial.codigo }) : cerrarSubvista()}
+            onHistorial={() => setSubvista({ tipo: 'historial', codigo: subvista.codigo })} />
         ) : subvista.tipo === 'alta' ? (
           <PantallaAlta
             codigo={subvista.codigo}
@@ -139,6 +156,7 @@ function ContenedorPrincipal() {
           />
         ) : pestana === 'inicio' ? (
           <PantallaInicio
+            onHistorial={() => setSubvista({ tipo: 'historial' })}
             onEscanear={() => setPestana('escaner')}
             onManual={() => setSubvista({ tipo: 'manual' })}
             onIrDashboard={() => setPestana('dashboard')}
@@ -162,6 +180,7 @@ function ContenedorPrincipal() {
           />
         ) : pestana === 'dashboard' ? (
           <PantallaDashboard
+            onHistorial={() => setSubvista({ tipo: 'historial' })}
             onAbrirCodigo={(codigo) => setSubvista({ tipo: 'producto', codigo })}
             onIrAEscanear={() => setPestana('escaner')}
           />
@@ -211,14 +230,35 @@ function ContenedorPrincipal() {
 }
 
 export default function Raiz() {
+  const [errorDb, setErrorDb] = useState<Error | null>(null);
+  const [intento, setIntento] = useState(0);
+  const [iniciando, setIniciando] = useState(true);
+  const inicializar = useCallback(async (db: SQLiteDatabase) => {
+    await migrar(db);
+    setIniciando(false);
+  }, []);
+
   return (
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
     <ProveedorTema>
-      <Suspense fallback={<Cargando texto="Inicializando motor SQLite…" />}>
-        <SQLiteProvider databaseName="bodega.db" onInit={migrar} useSuspense>
-          <ContenedorPrincipal />
-        </SQLiteProvider>
-      </Suspense>
+    <ProveedorPeriodo>
+      {errorDb ? (
+        <ErrorEstado mensaje={`No se pudo abrir la bodega: ${errorDb.message}`} onReintentar={() => {
+          setIniciando(true);
+          setIntento((n) => n + 1);
+          setErrorDb(null);
+        }} />
+      ) : (
+        <>
+          {iniciando ? <Cargando texto="Inicializando motor SQLite…" /> : null}
+          <SQLiteProvider key={intento} databaseName="bodega.db" onInit={inicializar} onError={setErrorDb}>
+            <ContenedorPrincipal />
+          </SQLiteProvider>
+        </>
+      )}
+    </ProveedorPeriodo>
     </ProveedorTema>
+    </SafeAreaProvider>
   );
 }
 

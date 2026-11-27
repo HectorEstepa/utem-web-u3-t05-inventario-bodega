@@ -4,7 +4,7 @@
  * Por qué existe este archivo:
  * un lector de cámara entrega lecturas corruptas cuando el código está arrugado,
  * con poca luz o parcialmente tapado. Validar el dígito verificador en memoria
- * cuesta microsegundos y evita una consulta a SQLite (≈1-3 ms) por cada
+ * evita una consulta a SQLite por cada
  * lectura basura. Con el escáner disparando varias veces por segundo, filtrar
  * acá mantiene el hilo principal libre para dibujar.
  *

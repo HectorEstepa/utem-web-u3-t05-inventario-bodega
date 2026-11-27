@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { ResumenFlujos } from '../components/ResumenFlujos';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -11,7 +12,9 @@ import {
   type Producto,
   type ResumenEjecutivo,
 } from '../db/inventario';
+import { formatearFechaHoraSlash } from '../lib/periodo';
 import { formatearCLP } from '../lib/stock';
+import { usePeriodo } from '../periodo';
 import { useTema } from '../theme';
 
 /**
@@ -22,12 +25,14 @@ import { useTema } from '../theme';
  * - Solo los artículos críticos (agotados o bajo mínimo) que requieren acción hoy.
  */
 export function PantallaInicio({
+  onHistorial,
   onEscanear,
   onManual,
   onIrDashboard,
   onIrInventario,
   onAbrirProducto,
 }: {
+  onHistorial: () => void;
   onEscanear: () => void;
   onManual: () => void;
   onIrDashboard: () => void;
@@ -35,36 +40,45 @@ export function PantallaInicio({
   onAbrirProducto: (p: Producto) => void;
 }) {
   const db = useSQLiteContext();
+  const { periodo } = usePeriodo();
+  const [actualizado, setActualizado] = useState(() => new Date());
   const { paleta } = useTema();
   const [resumen, setResumen] = useState<ResumenEjecutivo | null>(null);
   const [criticos, setCriticos] = useState<Producto[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const ultimaConsulta = useRef(0);
   const cargar = useCallback(async () => {
+    const consulta = ++ultimaConsulta.current;
+    setCargando(true);
     try {
       setError(null);
       const [res, crit] = await Promise.all([
-        obtenerResumenEjecutivo(db),
+        obtenerResumenEjecutivo(db, periodo),
         listarCriticos(db, 6),
       ]);
+      if (consulta !== ultimaConsulta.current) return;
       setResumen(res);
+      setActualizado(new Date());
       setCriticos(crit);
     } catch (e) {
+      if (consulta !== ultimaConsulta.current) return;
       setError(e instanceof Error ? e.message : 'No se pudo leer el estado de la bodega.');
     } finally {
-      setCargando(false);
+      if (consulta === ultimaConsulta.current) setCargando(false);
     }
-  }, [db]);
+  }, [db, periodo]);
 
   useEffect(() => {
     cargar();
+    return () => { ultimaConsulta.current++; };
   }, [cargar]);
 
   const cargarDemo = async () => {
     setCargando(true);
-    await sembrarCatalogoDemo(db);
-    await cargar();
+    try { await sembrarCatalogoDemo(db); await cargar(); }
+    catch (e) { setError(e instanceof Error ? e.message : 'No se pudo cargar el catálogo.'); setCargando(false); }
   };
 
   if (cargando) return <Cargando texto="Preparando resumen de bodega…" />;
@@ -96,7 +110,7 @@ export function PantallaInicio({
         ]}
       >
         <View style={s.heroTop}>
-          <Text style={s.heroKicker}>CAPITAL EN INVENTARIO</Text>
+          <Text style={s.heroKicker}>STOCK ACTUAL VALORIZADO</Text>
           <View style={s.heroPill}>
             <Text style={s.heroPillTxt}>{resumen.totalSkus} SKUs</Text>
           </View>
@@ -112,6 +126,10 @@ export function PantallaInicio({
           </Pressable>
         </View>
       </View>
+
+      <Text style={{ color: paleta.textoSecundario, fontSize: 12 }}>
+        Stock actual · actualizado {formatearFechaHoraSlash(actualizado)}
+      </Text>
 
       {/* Accesos directos principales */}
       <View style={s.gridAcciones}>
@@ -154,31 +172,11 @@ export function PantallaInicio({
         </Pressable>
       </View>
 
-      {/* Tira comunicativa de flujo del día */}
-      <Pressable
-        onPress={onIrDashboard}
-        style={({ pressed }) => [
-          s.tiraResumen,
-          { backgroundColor: paleta.superficie, borderColor: paleta.borde },
-          pressed && { opacity: 0.8 },
-        ]}
-      >
-        <View style={s.tiraCol}>
-          <Text style={[s.tiraLbl, { color: paleta.textoTerciario }]}>SALIDAS / VENTAS</Text>
-          <Text style={[s.tiraVal, { color: paleta.rojo }]}>
-            {formatearCLP(resumen.salidasMontoCLP)}
-          </Text>
-        </View>
-        <View style={[s.divisorVert, { backgroundColor: paleta.separador }]} />
-        <View style={s.tiraCol}>
-          <Text style={[s.tiraLbl, { color: paleta.textoTerciario }]}>ENTRADAS</Text>
-          <Text style={[s.tiraVal, { color: paleta.verde }]}>
-            {formatearCLP(resumen.entradasMontoCLP)}
-          </Text>
-        </View>
-        <Ionicons name="bar-chart-outline" size={20} color={paleta.acento} />
-      </Pressable>
+      <ResumenFlujos resumen={resumen} onCambiarFechas={onIrDashboard} />
 
+      <Pressable onPress={onHistorial} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
+        <Text style={{ color: paleta.acento, fontWeight: '700' }}>Ver historial de movimientos ›</Text>
+      </Pressable>
       {/* Alertas de reposición (solo lo urgente) */}
       <View style={s.secRow}>
         <Text style={[s.secTitulo, { color: paleta.texto }]}>
