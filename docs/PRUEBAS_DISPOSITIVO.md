@@ -95,7 +95,18 @@ Estado: interacción física pendiente.
 | P30 | Entrada 20, despacho 5; rectificar stock de 15 a 10 | Entrada vigente 15; salida real 5; stock 10 |
 | P31 | Rectificar recepción de otro mes; exportar ambos períodos | Flujo corregido en fecha original; constancia en fecha de corrección; precio histórico conservado |
 | P32 | No elegir entrada, motivo vacío, selección obsoleta o corrección que excede la entrada | Rechazo sin cambios parciales ni evento duplicado |
-| P33 | Elegir Ajuste de conteo | Cambia solo stock; flujos sin cambio; Excel distingue conteo y rectificación |
+| P33 | Abrir Editar en v1.6.1 | Una sola corrección, sin selector de tipo; ajustes antiguos conservados |
 | P34 | Actualizar desde v3 con ajustes existentes y consultar entradas antiguas por páginas | No se pierden datos ni saldos; selección por ID/fecha funciona; no se reinterpretan salidas anteriores |
 
 Las comprobaciones automáticas usan SQLite real de Node; no sustituyen estas pruebas nativas.
+
+## Editor simplificado v1.6.1 — validación física pendiente
+
+- Una entrada: selección automática; cambiar 20→15, borrar el campo, reescribirlo y volver a 20 no pierde la selección ni reinicia la consulta.
+- Varias entradas: selector en modal, lista paginada independiente; elegir conserva el formulario y cerrar sin elegir conserva la selección previa.
+- Cancelar y reabrir: cantidad, motivo y datos vuelven al estado guardado, sin escribir movimientos.
+- Cantidad vacía, entrada insuficiente, sin selección o motivo vacío: guardar deshabilitado con indicaciones visibles; entradas/salidas bloqueadas durante edición.
+- Verificar teclado, desplazamiento y toques en Android/iOS; se retiró el botón que envolvía todo el formulario y la lista vertical anidada.
+- Sin entradas: editar metadatos sin cambiar cantidad; mostrar explicación para la cantidad.
+
+27 pruebas de reglas de datos, TypeScript y bundles no sustituyen estas interacciones nativas.

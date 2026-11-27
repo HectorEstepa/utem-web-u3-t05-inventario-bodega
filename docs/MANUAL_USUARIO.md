@@ -1,6 +1,6 @@
 # Manual de usuario: inventario de bodega
 
-Aplicación v1.6.0. Dirigido al encargado y al operador de una bodega. Describe la versión actual: inventario local, un teléfono como registro operativo y cantidades enteras. No incluye sincronización, facturación ni respaldo/restauración.
+Aplicación v1.6.1. Dirigido al encargado y al operador de una bodega. Describe la versión actual: inventario local, un teléfono como registro operativo y cantidades enteras. No incluye sincronización, facturación ni respaldo/restauración.
 
 ## 1. Qué se entrega al operador
 
@@ -66,7 +66,7 @@ Son alertas visuales dentro de la app. No se envían correos, avisos push, pedid
 ## 7. Buscar, editar y consultar historial
 
 - En **Inventario**, escribir parte del nombre o código. Probar **Todos**, **Críticos** y **Agotados** según la tarea.
-- Abrir la ficha y usar **Editar** para cambiar nombre, precio, mínimo o corregir la cantidad. Elegir Corregir entrada para rectificar una recepción mal digitada o Ajuste de conteo para una diferencia física; ver sección 8.
+- Abrir la ficha y usar **Editar** para cambiar nombre, precio, mínimo o corregir la cantidad. La cantidad se corrige rectificando la recepción mal digitada; hay un solo flujo, sin selector de tipo. Ver sección 8.
 - Al modificar el precio, los movimientos anteriores conservan el precio unitario que tenían al registrarse. La valorización del inventario usa el precio actual.
 - La ficha muestra los cinco movimientos más recientes de todo el historial. Su botón abre una pantalla dedicada para buscar y elegir fechas. Inicio y Dashboard también tienen acceso al historial, paginado de 50 en 50.
 - La app no identifica al trabajador que hizo cada movimiento y no impide editar/eliminar datos por rol. Para un piloto, el encargado debe definir quién puede operar el teléfono.
@@ -90,7 +90,7 @@ Para corregir una **entrada mal digitada**:
 
 1. Confirmar la cantidad que realmente se recibió e identificar la entrada equivocada.
 2. Abrir **Inventario → producto → Editar** y escribir la **Cantidad disponible corregida** (saldo que debe quedar hoy).
-3. Dejar seleccionada **Corregir entrada**. Tocar **Elegir la entrada que quiero corregir** y seleccionar la recepción por fecha, ID y nota. Se pueden cargar más entradas, sin restringirse al período del Dashboard.
+3. Si existe una sola entrada, queda seleccionada automáticamente. Si hay varias, tocar **Elegir entrada a corregir** y elegir por fecha, ID y nota en la ventana de selección. Se pueden cargar más entradas; cerrar la ventana sin elegir conserva la selección anterior. La selección no se pierde al borrar o reescribir la cantidad.
 4. Revisar ambas vistas previas: cantidad anterior/nueva de esa entrada y stock anterior/nuevo. Escribir el motivo obligatorio, de hasta 160 caracteres.
 5. **Guardar cambios**. La entrada rectificada cambia los totales de recepción y el stock; no crea salidas. Se conserva el original y una constancia vinculada en Historial → Ajustes, con fecha y motivo.
 
@@ -100,7 +100,9 @@ Con despachos posteriores hay que corregir el saldo actual: si se registró entr
 
 **Fechas y precios:** la entrada rectificada mantiene su fecha y precio unitario histórico. Los totales y gráficos del período de recepción se recalculan con la cantidad vigente. La constancia figura con la fecha de corrección. Por ejemplo, rectificar hoy una recepción de octubre modifica los totales de octubre, sin crear una recepción o despacho de hoy. Un Excel ya guardado no se actualiza solo: exportar nuevamente para obtener la versión rectificada.
 
-**Ajuste de conteo:** elegirlo cuando hay una diferencia física que no corresponde a una entrada mal digitada. Cambia solo las existencias y su valor actual; conserva entradas/salidas. Requiere motivo y guarda saldos anterior/nuevo. No debe usarse para rectificar una recepción conocida.
+**Un solo flujo de corrección:** se retiró la alternativa Ajuste de conteo del editor. Las constancias de ajustes anteriores siguen visibles y no se eliminan ni reclasifican. Una diferencia física sin recepción mal digitada requiere investigar la causa; no elegir una entrada arbitraria para forzar un saldo.
+
+El botón **Guardar cambios** se habilita cuando la cantidad y, si cambia el saldo, la entrada y el motivo son válidos. **Cancelar** descarta la edición y restablece sus valores. Durante la edición, los botones de Entrada/Salida están deshabilitados para evitar operaciones que alteren la ficha a mitad de la corrección. Si no hay entradas previas, se pueden editar nombre, precio y mínimo conservando la cantidad; una recepción nueva se registra con Entrada fuera del editor.
 
 Sin diferencia de cantidad no se crea un evento. Si la entrada o el stock cambió mientras se editaba, volver a abrir la ficha y seleccionar la entrada actualizada. Todas las escrituras se confirman juntas. Los movimientos y ajustes ya existentes no se convierten automáticamente en rectificaciones ni se borran: investigar antes de decidir cómo tratarlos. La nota no identifica de forma segura al responsable ni sustituye una auditoría firmada.
 
