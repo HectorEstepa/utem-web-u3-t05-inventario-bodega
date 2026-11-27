@@ -24,7 +24,7 @@ El código incorpora el alcance mínimo del **T05: inventario de bodega con lect
 
 ## Correcciones
 
-- React Native alineado a 0.88.1, versión esperada por Expo; lockfile actualizado para instalaciones reproducibles.
+- Dependencias alineadas al catálogo oficial: Expo 58.1, React Native 0.88.1, FileSystem 58.0.15, Sharing 58.0.24 y TypeScript 6.0.3; tipos Node explícitos y lockfile actualizado.
 - Dos verificadores del catálogo demo corregidos; datos identificados como ficticios.
 - Validación GTIN, stock inicial y mínimo en datos; UPC-A normalizado para evitar duplicados.
 - Migraciones atómicas y rechazo de bases de versión futura.
@@ -50,4 +50,6 @@ La revisión no envía correo, no firma por el equipo ni atribuye pruebas físic
 
 ## Verificación técnica de esta revisión
 
-En Windows con Node 24.20.0: TypeScript sin errores, 14 pruebas aprobadas y exportación de bundles JavaScript Android/iOS correcta. `expo install --check` no detectó desajustes usando el catálogo local del SDK (`EXPO_OFFLINE=1`); esa comprobación no consulta el catálogo remoto. Se añadió CI para repetir instalación, tipos, pruebas, compatibilidad y exportación en GitHub. La creación de un APK y ejecución física siguen pendientes.
+En Windows con Node 24.20.0: TypeScript sin errores, 14 pruebas aprobadas y exportación de bundles JavaScript Android/iOS correcta. `expo install --check` no detectó desajustes tanto con el catálogo local como con el catálogo en línea. Se añadió CI para repetir instalación, tipos, pruebas, compatibilidad y exportación en GitHub. La primera corrida remota detectó versiones más recientes que el catálogo local; se actualizaron las dependencias y se volvió a verificar. La creación de un APK y ejecución física siguen pendientes.
+
+La auditoría npm detectó tres avisos moderados derivados de `minimatch` a través de `@expo/fingerprint` y Expo (GHSA-g3hv-75wg-m249); no encontró avisos altos o críticos. La solución automática propuesta retrocede a Expo 52: no se aplicó porque rompería la compatibilidad con SDK 58. Queda pendiente una actualización compatible de esa dependencia de las herramientas de Expo; no se afirma que la auditoría esté libre de avisos.
