@@ -26,6 +26,7 @@ import {
   type Movimiento,
   type Producto,
 } from '../db/inventario';
+import { formatearFechaHoraSlash } from '../lib/periodo';
 import { estadoDeStock, ETIQUETA_ESTADO, formatearCLP, validarMovimiento } from '../lib/stock';
 import { coloresEstado, useTema } from '../theme';
 
@@ -558,13 +559,7 @@ export function PantallaProducto({
                           {m.entrada_corregida_id ? `Corrección entrada #${m.entrada_corregida_id}: ${m.entrada_cantidad_antes} → ${m.entrada_cantidad_despues} u. · ` : ''}
                           {m.tipo === 'IN' && m.cantidad_original !== m.cantidad ? `Original: ${m.cantidad_original} u. · ` : ''}
                           {m.nota ? `${m.nota} · ` : ''}
-                          {new Date(m.fecha).toLocaleString('es-CL', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                          {formatearFechaHoraSlash(m.fecha)}
                         </Text>
                       </View>
                       <Text style={[s.movMonto, { color: paleta.texto }]}>

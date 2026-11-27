@@ -1,26 +1,104 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { MovimientoDetallado } from '../db/inventario';
+import { formatearFechaHoraSlash } from '../lib/periodo';
 import { formatearCLP } from '../lib/stock';
 import { useTema } from '../theme';
 
-export function FilaMovimiento({ movimiento: m, onPress }: { movimiento: MovimientoDetallado; onPress: (codigo: string) => void }) {
+export function FilaMovimiento({
+  movimiento: m,
+  onPress,
+}: {
+  movimiento: MovimientoDetallado;
+  onPress: (codigo: string) => void;
+}) {
   const { paleta } = useTema();
-  const entrada = m.tipo === 'IN';
-  const color = m.tipo === 'ADJ' ? paleta.acento : entrada ? paleta.verde : paleta.salida;
+  const esAjuste = m.tipo === 'ADJ';
+  const esEntrada = m.tipo === 'IN';
+  const color = esAjuste ? paleta.acento : esEntrada ? paleta.verde : paleta.salida;
+  const fondoBadge = esAjuste
+    ? paleta.acentoSuave
+    : esEntrada
+      ? paleta.verdeSuave
+      : paleta.salidaSuave;
+
+  const tituloTipo = esAjuste
+    ? m.entrada_corregida_id
+      ? `Rectificación · ${m.stock_antes} → ${m.stock_despues} u.`
+      : `Ajuste de stock · ${m.stock_antes} → ${m.stock_despues} u.`
+    : `${esEntrada ? 'Entrada' : 'Salida'} · ${m.cantidad} u.`;
+
   return (
-    <Pressable onPress={() => onPress(m.codigo)} accessibilityRole="button" style={[s.fila, { backgroundColor: paleta.superficie, borderColor: paleta.borde }]}>
+    <Pressable
+      onPress={() => onPress(m.codigo)}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        s.fila,
+        { backgroundColor: paleta.superficie, borderColor: paleta.borde },
+        pressed && { opacity: 0.85 },
+      ]}
+    >
       <View style={s.encabezado}>
-        <Text style={[s.tipo, { color }]}>{m.tipo === 'ADJ' ? `↔ ${m.entrada_corregida_id ? 'Rectificación' : 'Ajuste'} · ${m.stock_antes} → ${m.stock_despues} u.` : `${entrada ? '↙ Entrada' : '↗ Salida'} · ${m.cantidad} u.`}</Text>
-        <Text style={{ color: paleta.texto, fontWeight: '700' }}>{m.tipo === 'ADJ' ? 'Corrección' : formatearCLP(m.cantidad * m.precio_unitario)}</Text>
+        <View style={[s.badge, { backgroundColor: fondoBadge }]}>
+          <Text style={[s.tipo, { color }]}>{tituloTipo}</Text>
+        </View>
+        <Text style={[s.monto, { color: esAjuste ? paleta.acento : paleta.texto }]}>
+          {esAjuste ? 'Sin salida' : formatearCLP(m.cantidad * m.precio_unitario)}
+        </Text>
       </View>
-      <Text style={{ color: paleta.texto, fontWeight: '700', fontSize: 16 }}>{m.nombre_producto}</Text>
-      <Text style={{ color: paleta.textoSecundario }}>GTIN {m.codigo} · operación #{m.id}</Text>
-      <Text style={{ color: paleta.textoSecundario }}>{new Date(m.fecha).toLocaleString('es-CL', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</Text>
-      {m.tipo === 'IN' && m.cantidad_original !== undefined && m.cantidad_original !== m.cantidad ? <Text style={{ color: paleta.acento }}>Entrada rectificada · original: {m.cantidad_original} u. · vigente: {m.cantidad} u.</Text> : null}
-      {m.entrada_corregida_id ? <Text style={{ color: paleta.acento }}>Corrección de entrada #{m.entrada_corregida_id}: {m.entrada_cantidad_antes} → {m.entrada_cantidad_despues} u. Sin despacho.</Text> : null}
-      {m.nota ? <Text style={{ color: paleta.texto }}>{m.nota}</Text> : null}
+
+      <Text style={[s.nombre, { color: paleta.texto }]}>{m.nombre_producto}</Text>
+      <Text style={[s.meta, { color: paleta.textoSecundario }]}>
+        {formatearFechaHoraSlash(m.fecha, true)} · GTIN {m.codigo} · #{m.id}
+      </Text>
+
+      {esEntrada && m.cantidad_original !== undefined && m.cantidad_original !== m.cantidad ? (
+        <View style={[s.notaBox, { backgroundColor: paleta.acentoSuave }]}>
+          <Text style={[s.notaDestacada, { color: paleta.acento }]}>
+            Entrada corregida: original {m.cantidad_original} u. → vigente {m.cantidad} u.
+          </Text>
+        </View>
+      ) : null}
+
+      {m.entrada_corregida_id ? (
+        <View style={[s.notaBox, { backgroundColor: paleta.acentoSuave }]}>
+          <Text style={[s.notaDestacada, { color: paleta.acento }]}>
+            Entrada #{m.entrada_corregida_id} ajustada de {m.entrada_cantidad_antes} →{' '}
+            {m.entrada_cantidad_despues} u. (no se registró salida)
+          </Text>
+        </View>
+      ) : null}
+
+      {m.nota ? <Text style={[s.nota, { color: paleta.texto }]}>{m.nota}</Text> : null}
     </Pressable>
   );
 }
-const s = StyleSheet.create({ fila: { padding: 14, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, gap: 5, marginBottom: 8 }, encabezado: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 }, tipo: { fontWeight: '800' } });
+
+const s = StyleSheet.create({
+  fila: {
+    padding: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    gap: 6,
+    marginBottom: 8,
+  },
+  encabezado: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  tipo: { fontSize: 12.5, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  monto: { fontSize: 14, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  nombre: { fontWeight: '700', fontSize: 15.5 },
+  meta: { fontSize: 12, fontVariant: ['tabular-nums'] },
+  notaBox: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
+  notaDestacada: { fontSize: 12, fontWeight: '700' },
+  nota: { fontSize: 13 },
+});

@@ -15,6 +15,7 @@ import {
   type ResumenEjecutivo,
 } from '../db/inventario';
 import { exportarReporteExcel } from '../lib/exportarExcel';
+import { formatearFechaHoraSlash } from '../lib/periodo';
 import { formatearCLP } from '../lib/stock';
 import { SelectorPeriodo } from '../components/SelectorPeriodo';
 import { FilaMovimiento } from '../components/FilaMovimiento';
@@ -148,7 +149,10 @@ export function PantallaDashboard({
         <GraficoEvolucion key={periodo.detalle} datos={evolucion} />
       </View>
       {periodo.desde === null && resumen.primeraFecha !== null && resumen.ultimaFecha !== null ? (
-        <Text style={{ color: paleta.textoSecundario }}>Registros incluidos: {new Date(resumen.primeraFecha).toLocaleString('es-CL')} — {new Date(resumen.ultimaFecha).toLocaleString('es-CL')}</Text>
+        <Text style={{ color: paleta.textoSecundario }}>
+          Registros incluidos: {formatearFechaHoraSlash(resumen.primeraFecha)} al{' '}
+          {formatearFechaHoraSlash(resumen.ultimaFecha)}
+        </Text>
       ) : null}
 
       {mensajeExport ? (
@@ -205,7 +209,9 @@ export function PantallaDashboard({
             </View>
           </View>
 
-          <Text style={{ color: paleta.textoSecundario }}>Stock actualizado {actualizado.toLocaleString('es-CL')}. Flujos: {periodo.detalle}.</Text>
+          <Text style={{ color: paleta.textoSecundario }}>
+            Stock actualizado {formatearFechaHoraSlash(actualizado)}. Flujos: {periodo.detalle}.
+          </Text>
 
           {/* Distribución de Salud de Stock */}
           <View

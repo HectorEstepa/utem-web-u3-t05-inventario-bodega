@@ -3,6 +3,7 @@ import { FlatList, Modal, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { listarMovimientosGlobales, type Movimiento } from '../db/inventario';
+import { formatearFechaHoraSlash } from '../lib/periodo';
 import { useTema } from '../theme';
 import { Boton } from './Boton';
 
@@ -51,7 +52,7 @@ export function ElegirEntradaCorreccion({ codigo, seleccion, diferencia, onElegi
     <Text style={{ color: c.texto, fontWeight: '700' }}>Entrada que se corregirá</Text>
     {ocupado && !entradas.length ? <Text style={{ color: c.textoSecundario }}>Consultando entradas…</Text> : null}
     {seleccion ? <View style={{ padding: 12, gap: 4, borderRadius: 12, backgroundColor: c.acentoSuave }}>
-      <Text style={{ color: c.texto }}>Entrada #{seleccion.id} · {new Date(seleccion.fecha).toLocaleString('es-CL')}</Text>
+      <Text style={{ color: c.texto }}>Entrada #{seleccion.id} · {formatearFechaHoraSlash(seleccion.fecha)}</Text>
       <Text style={{ color: c.textoSecundario }}>{seleccion.nota || 'Sin nota'}</Text>
       {nuevaCantidad !== null ? <Text style={{ color: nuevaCantidad < 0 ? c.rojo : c.acento, fontWeight: '800' }}>Cantidad de entrada: {seleccion.cantidad} → {nuevaCantidad} u.</Text> : null}
       {nuevaCantidad !== null && nuevaCantidad < 0 ? <Text accessibilityRole="alert" style={{ color: c.rojo }}>Esta corrección supera la cantidad de esa entrada. Revisa la cantidad o elige otra entrada.</Text> : null}
@@ -70,7 +71,7 @@ export function ElegirEntradaCorreccion({ codigo, seleccion, diferencia, onElegi
             onPress={() => { onElegir(m); setAbierto(false); }}
             style={{ minHeight: 56, padding: 14, gap: 6, borderWidth: 1, borderRadius: 12, borderColor: seleccion?.id === m.id ? c.acento : c.borde, backgroundColor: c.superficie }}>
             <Text style={{ color: c.texto, fontWeight: '700' }}>Entrada #{m.id} · {m.cantidad} u.{seleccion?.id === m.id ? ' · seleccionada' : ''}</Text>
-            <Text style={{ color: c.textoSecundario }}>{new Date(m.fecha).toLocaleString('es-CL')}</Text>
+            <Text style={{ color: c.textoSecundario }}>{formatearFechaHoraSlash(m.fecha)}</Text>
             <Text style={{ color: c.textoSecundario }}>{m.nota || 'Sin nota'}</Text>
           </Pressable>}
           ListFooterComponent={<View style={{ gap: 12 }}>{mensajeError}{hayMas ? <Boton titulo={ocupado ? 'Cargando…' : 'Cargar más entradas'} estilo="secundario" deshabilitado={ocupado} onPress={mas} /> : null}</View>} />

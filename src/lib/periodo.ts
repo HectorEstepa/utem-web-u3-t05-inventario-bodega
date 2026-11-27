@@ -12,6 +12,23 @@ export function fechaLocal(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** Formatea una fecha visible al usuario siempre con slash: DD/MM/AAAA. */
+export function formatearFechaSlash(valor: Date | number): string {
+  const d = valor instanceof Date ? valor : new Date(valor);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
+/** Formatea fecha y hora visible al usuario siempre con slash: DD/MM/AAAA HH:mm[:ss]. */
+export function formatearFechaHoraSlash(valor: Date | number, conSegundos = false): string {
+  const d = valor instanceof Date ? valor : new Date(valor);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  const hora = conSegundos ? `${hh}:${mi}:${String(d.getSeconds()).padStart(2, '0')}` : `${hh}:${mi}`;
+  return `${formatearFechaSlash(d)} ${hora}`;
+}
+
 export function leerFechaLocal(texto: string): Date {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(texto)) throw new Error('La fecha debe tener formato AAAA-MM-DD.');
   const [y = 0, m = 0, d = 0] = texto.split('-').map(Number);
@@ -46,8 +63,7 @@ export function resolverPeriodo(s: SeleccionPeriodo, ahora = new Date()): Period
   }
   if (inicio > fin) throw new Error('La fecha inicial debe ser anterior o igual a la final.');
   const siguiente = new Date(fin.getFullYear(), fin.getMonth(), fin.getDate() + 1);
-  const formato = (v: Date) => v.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  return { desde: inicio.getTime(), hasta: siguiente.getTime(), etiqueta, detalle: `${formato(inicio)} — ${formato(fin)} · días completos` };
+  return { desde: inicio.getTime(), hasta: siguiente.getTime(), etiqueta, detalle: `${formatearFechaSlash(inicio)} al ${formatearFechaSlash(fin)} · días completos` };
 }
 
 export const TODO_EL_HISTORIAL: Periodo = resolverPeriodo({ modo: 'todo', desde: '', hasta: '' });

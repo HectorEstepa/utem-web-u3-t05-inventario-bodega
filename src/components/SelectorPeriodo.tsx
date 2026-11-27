@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { fechaLocal, leerFechaLocal, resolverPeriodo, type ModoPeriodo } from '../lib/periodo';
+import { fechaLocal, formatearFechaSlash, leerFechaLocal, resolverPeriodo, type ModoPeriodo } from '../lib/periodo';
 import { usePeriodo } from '../periodo';
 import { useTema } from '../theme';
 import { Boton } from './Boton';
@@ -44,7 +44,7 @@ export function SelectorPeriodo() {
             <Text style={[s.titulo, { color: paleta.texto }]}>Elegir período</Text>
             <Text style={{ color: paleta.textoSecundario }}>Incluye los días inicial y final completos. Cambiar el período también actualiza Inicio, historial y reportes.</Text>
             {(['desde', 'hasta'] as const).map((c) => (
-              <Boton key={c} titulo={`${c === 'desde' ? 'Desde' : 'Hasta'}: ${leerFechaLocal(c === 'desde' ? desde : hasta).toLocaleDateString('es-CL')}`}
+              <Boton key={c} titulo={`${c === 'desde' ? 'Desde' : 'Hasta'}: ${formatearFechaSlash(leerFechaLocal(c === 'desde' ? desde : hasta))}`}
                 estilo="secundario" onPress={() => setCampo(c)} />
             ))}
             {campo ? <DateTimePicker value={leerFechaLocal(campo === 'desde' ? desde : hasta)} mode="date"

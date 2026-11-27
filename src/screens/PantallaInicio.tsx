@@ -12,6 +12,7 @@ import {
   type Producto,
   type ResumenEjecutivo,
 } from '../db/inventario';
+import { formatearFechaHoraSlash } from '../lib/periodo';
 import { formatearCLP } from '../lib/stock';
 import { usePeriodo } from '../periodo';
 import { useTema } from '../theme';
@@ -126,7 +127,9 @@ export function PantallaInicio({
         </View>
       </View>
 
-      <Text style={{ color: paleta.textoSecundario, fontSize: 12 }}>Stock actual · actualizado {actualizado.toLocaleString('es-CL')}</Text>
+      <Text style={{ color: paleta.textoSecundario, fontSize: 12 }}>
+        Stock actual · actualizado {formatearFechaHoraSlash(actualizado)}
+      </Text>
 
       {/* Accesos directos principales */}
       <View style={s.gridAcciones}>

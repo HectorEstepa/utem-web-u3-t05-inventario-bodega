@@ -1,7 +1,7 @@
 import XLSX from 'xlsx-js-style';
 import type { DatosReporte, FlujoProducto } from '../db/reportes.ts';
 import { estadoDeStock, ETIQUETA_ESTADO } from './stock.ts';
-import { fechaLocal } from './periodo.ts';
+import { fechaLocal, formatearFechaHoraSlash } from './periodo.ts';
 
 const CLP = '"$"#,##0';
 const borde = { top: { style: 'thin', color: { rgb: 'CBD5E1' } }, bottom: { style: 'thin', color: { rgb: 'CBD5E1' } }, left: { style: 'thin', color: { rgb: 'CBD5E1' } }, right: { style: 'thin', color: { rgb: 'CBD5E1' } } };
@@ -9,7 +9,7 @@ const estilo = (fondo = 'FFFFFF', color = '0F172A', bold = false) => ({ font: { 
 const celda = (v: string | number, s = estilo(), z?: string): XLSX.CellObject => ({ v, t: typeof v === 'number' ? 'n' : 's', s, ...(z ? { z } : {}) });
 const dinero = (v: number) => celda(v, estilo(), CLP);
 const formula = (f: string, v: number, z?: string): XLSX.CellObject => ({ f, v, t: 'n', s: estilo('E0F2FE', '0F172A', true), ...(z ? { z } : {}) });
-const fechaHora = (n: number) => new Date(n).toLocaleString('es-CL');
+const fechaHora = (n: number) => formatearFechaHoraSlash(n, true);
 
 /** Generación pura: se prueba con Node sin archivos, Expo ni menú de compartir. */
 export function crearLibroReporte(d: DatosReporte): XLSX.WorkBook {
