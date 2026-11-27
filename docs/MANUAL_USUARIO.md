@@ -1,6 +1,6 @@
 # Manual de usuario: inventario de bodega
 
-Aplicación v1.4.0. Dirigido al encargado y al operador de una bodega. Describe la versión actual: inventario local, un teléfono como registro operativo y cantidades enteras. No incluye sincronización, facturación ni respaldo/restauración.
+Aplicación v1.5.0. Dirigido al encargado y al operador de una bodega. Describe la versión actual: inventario local, un teléfono como registro operativo y cantidades enteras. No incluye sincronización, facturación ni respaldo/restauración.
 
 ## 1. Qué se entrega al operador
 
@@ -66,7 +66,7 @@ Son alertas visuales dentro de la app. No se envían correos, avisos push, pedid
 ## 7. Buscar, editar y consultar historial
 
 - En **Inventario**, escribir parte del nombre o código. Probar **Todos**, **Críticos** y **Agotados** según la tarea.
-- Abrir la ficha y usar **Editar** para cambiar nombre, precio o mínimo. El stock se modifica mediante movimientos, no editando el número directamente.
+- Abrir la ficha y usar **Editar** para cambiar nombre, precio, mínimo o corregir la cantidad. La corrección genera un Ajuste separado de entradas/salidas; ver sección 8.
 - Al modificar el precio, los movimientos anteriores conservan el precio unitario que tenían al registrarse. La valorización del inventario usa el precio actual.
 - La ficha muestra los cinco movimientos más recientes de todo el historial. Su botón abre una pantalla dedicada para buscar y elegir fechas. Inicio y Dashboard también tienen acceso al historial, paginado de 50 en 50.
 - La app no identifica al trabajador que hizo cada movimiento y no impide editar/eliminar datos por rol. Para un piloto, el encargado debe definir quién puede operar el teléfono.
@@ -74,19 +74,30 @@ Son alertas visuales dentro de la app. No se envían correos, avisos push, pedid
 ## Consultar un período y el historial
 
 1. En Dashboard revisar **Período de movimientos**. Al iniciar la app se elige el mes actual; antes de v1.4.0 los indicadores acumulaban todo el historial.
-2. Tocar Hoy, 7 días, 30 días, Mes, Año o Todo. Para otro intervalo, tocar **Elegir fechas**, seleccionar Desde/Hasta en el calendario y **Aplicar período**. Cancelar conserva el filtro anterior.
+2. Deslizar horizontalmente la barra y tocar Hoy, 7 días, 1M (30 días), 3M, 6M, 1A (12 meses móviles), Este mes, Este año o Todo. Para otro intervalo, tocar **Elegir fechas**, seleccionar Desde/Hasta en el calendario y **Aplicar período**. Cancelar conserva el filtro anterior.
 3. Comprobar las fechas escritas. Se incluyen ambos días completos y se usa la hora local del teléfono. Un rango sin operaciones muestra cero entradas/salidas; no implica que la bodega esté vacía.
 4. Volver a Inicio: sus entradas y salidas usan las mismas fechas. El stock, alertas y valorización actual no cambian por elegir otro período; no representan stock histórico.
 5. Abrir **Historial** desde Inicio/Dashboard o desde la ficha. Buscar por nombre, GTIN o nota, elegir tipo y cargar más páginas. Cada fila incluye fecha, hora e ID. Desde la ficha se restringe a ese producto.
-6. Para exportar, confirmar primero el período en Dashboard. El botón de exportación de Ajustes utiliza ese mismo período. Los filtros de búsqueda y tipo del historial no restringen el Excel: exporta todas las entradas y salidas de las fechas elegidas.
+6. Para exportar, confirmar primero el período en Dashboard. El botón de exportación de Ajustes utiliza ese mismo período. Los filtros de búsqueda y tipo del historial no restringen el Excel: exporta todas las entradas, salidas y ajustes de las fechas elegidas.
+
+En **Evolución de movimientos**, tocar o deslizar el gráfico para ver las unidades de cada intervalo en la tarjeta superior, con sus fechas. Entradas: verde y línea continua. Salidas: violeta y línea discontinua. Las flechas cambian de intervalo y **Tabla** muestra los mismos valores en una lista desplazable. Los períodos cortos (hasta 120 días) usan días; hasta ocho años, meses; los mayores, años. Los puntos suman unidades de cada intervalo, sin acumular; cero indica ausencia de actividad. No muestran la evolución histórica del stock. Los ajustes no se cuentan como entradas ni salidas. Los totales no dependen del filtro de tipo usado en la vista previa del historial.
 
 La selección es de sesión: al reiniciar el proceso vuelve al mes actual. Las salidas son violetas; no indican pérdidas. Rojo identifica errores, eliminación y stock agotado.
 
 ## 8. Equivocaciones y diferencias de conteo
 
-No hay edición, anulación ni deshacer de movimientos. Si se anotó una entrada o salida equivocada, el encargado puede autorizar un **movimiento compensatorio** después de comprobar el caso y dejar una nota que explique la corrección. No alterar el historial con herramientas técnicas para ocultarlo.
+Para corregir una cantidad mal digitada o una diferencia de conteo comprobada:
 
-Ejemplo: se ingresaron 10 unidades pero llegaron 8; comprobar el saldo y registrar una salida de 2 con una nota de ajuste autorizada. Si hay diferencia entre stock físico y app, investigar recepciones, despachos y unidad de medida antes del ajuste. La nota no sustituye una auditoría firmada ni identifica de forma segura al responsable.
+1. Investigar el error y confirmar con el encargado la cantidad física correcta. Una recepción o despacho real sigue usando Entrada o Salida.
+2. Abrir **Inventario → producto → Editar**.
+3. Cambiar **Cantidad disponible corregida**, incluyendo 0 si está agotado. Revisar la vista previa «saldo anterior → nuevo».
+4. Escribir el **motivo obligatorio** (hasta 160 caracteres), por ejemplo «Error al ingresar cantidad inicial; conteo confirmado».
+5. Tocar **Guardar cambios**. Revisar el nuevo saldo y la fila **Ajuste** en el historial. Si la cantidad no cambió, no se crea un ajuste.
+6. Si el stock cambió mientras se editaba, la app rechaza la corrección: volver a la lista, abrir de nuevo la ficha y revisar el saldo actualizado.
+
+Ejemplo: al crear el producto se digitó 10, pero eran 8. Editar la cantidad a 8 guarda un Ajuste de 10 → 8, diferencia −2. No crea una salida ni cambia los indicadores de entradas/salidas. La entrada inicial de 10 se conserva como fue registrada; el ajuste documenta la corrección por separado. Por eso entradas menos salidas no siempre coincide con el stock: también existen ajustes.
+
+No hay edición ni borrado individual de movimientos desde la interfaz; el ajuste corrige el saldo sin reescribir eventos anteriores. Si el motivo equivocado requiere aclaración sin cambiar cantidad, conservar una referencia externa para el encargado: no se permite crear ajustes de diferencia cero. La nota no identifica de forma segura al responsable ni sustituye una auditoría firmada.
 
 No usar **Eliminar producto** para corregir cantidades: elimina también su historial. **Vaciar toda la bodega** elimina todos los productos y movimientos del teléfono, después de confirmación. La app no tiene papelera ni restauración.
 
@@ -99,6 +110,8 @@ No usar **Eliminar producto** para corregir cantidades: elimina también su hist
 5. Guardar el reporte con fecha en el lugar acordado por la empresa y registrar quién lo revisó. El archivo temporal que genera la app está en caché y no es archivo permanente.
 
 El libro tiene cinco hojas: Resumen, Inventario_actual, Por_producto, Por_dia_producto y Movimientos. Las operaciones se limitan al período compartido visible en Dashboard; el stock es siempre el actual. Se incluyen todas las operaciones del rango hasta 20.000. Si hay más, la app solicita acotar fechas, sin exportar un detalle incompleto. Las sumas de entradas y salidas representan actividad, no utilidad ni saldo neto; el saldo se consulta en inventario.
+
+En **Movimientos**, los ajustes figuran como AJUSTE con motivo, saldos anterior/nuevo y diferencia con signo. Su subtotal de flujo está vacío. Resumen cuenta ajustes y su diferencia neta; Por_producto y Por_dia_producto suman solo entradas/salidas, sin incorporar ajustes a esas cifras.
 
 El reporte no contiene una restauración de SQLite ni puede importarse para recuperar el teléfono. No incluye impuestos, facturas, costos históricos completos ni cálculo de utilidades. No presentarlo como sistema contable.
 
@@ -128,6 +141,7 @@ El encargado comunica a soporte versión de la app, modelo/SO, acción, hora, me
 ## 12. Límites de los datos
 
 - Cantidades de movimiento: enteros entre 1 y 99.999. No hay kilos/litros fraccionados ni conversiones automáticas caja/unidad.
+- Corrección de stock: entero no negativo seguro (hasta 9.007.199.254.740.991); motivo de 1 a 160 caracteres.
 - Stock inicial: de 0 a 99.999; mínimo: de 1 a 99.999; precio CLP: entero de 0 a 99.999.999.
 - Nota de movimiento: hasta 80 caracteres guardados. Identificar referencias operativas, no información personal innecesaria.
 - Sin lotes, vencimientos, series, ubicaciones, órdenes de compra, múltiples bodegas ni proveedores.

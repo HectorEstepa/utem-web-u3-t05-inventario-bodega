@@ -11,11 +11,11 @@ import type { SQLiteDatabase } from 'expo-sqlite';
  *    como `INTEGER` no negativos, nunca coma flotante. `precio_unitario` en
  *    `movimientos` congela el valor vigente al instante de la entrada/salida
  *    para que cambiar un precio mañana no altere la contabilidad histórica.
- * 3. `PRAGMA user_version` permite migrar de v1 → v2 con `ALTER TABLE` sin
+ * 3. `PRAGMA user_version` permite migrar de v1/v2 → v3 atómicamente sin
  *    perder los productos que el usuario ya tenía registrados en el teléfono.
  */
 
-export const VERSION_ESQUEMA = 2;
+export const VERSION_ESQUEMA = 3;
 
 export async function migrar(db: SQLiteDatabase): Promise<void> {
   await db.execAsync('PRAGMA journal_mode = WAL');
@@ -65,6 +65,29 @@ export async function migrar(db: SQLiteDatabase): Promise<void> {
       `);
     }
 
+    const secuencia = await tx.getFirstAsync<{ seq: number }>("SELECT seq FROM sqlite_sequence WHERE name = 'movimientos'");
+    // SQLite no permite ampliar un CHECK con ALTER: copia atómica y conserva IDs.
+    await tx.execAsync(`
+      CREATE TABLE movimientos_v3 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        codigo TEXT NOT NULL REFERENCES productos(codigo) ON DELETE CASCADE,
+        tipo TEXT NOT NULL CHECK(tipo IN ('IN','OUT','ADJ')),
+        cantidad INTEGER NOT NULL CHECK(cantidad > 0),
+        precio_unitario INTEGER NOT NULL DEFAULT 0 CHECK(precio_unitario >= 0),
+        nota TEXT NOT NULL DEFAULT '', fecha INTEGER NOT NULL,
+        stock_antes INTEGER, stock_despues INTEGER,
+        CHECK(tipo != 'ADJ' OR (stock_antes IS NOT NULL AND stock_despues IS NOT NULL
+          AND stock_antes >= 0 AND stock_despues >= 0
+          AND cantidad = abs(stock_despues - stock_antes) AND length(trim(nota)) > 0))
+      );
+      INSERT INTO movimientos_v3(id,codigo,tipo,cantidad,precio_unitario,nota,fecha)
+        SELECT id,codigo,tipo,cantidad,precio_unitario,nota,fecha FROM movimientos;
+      DROP TABLE movimientos;
+      ALTER TABLE movimientos_v3 RENAME TO movimientos;
+      CREATE INDEX idx_mov_codigo ON movimientos(codigo,fecha DESC);
+      CREATE INDEX idx_mov_fecha ON movimientos(fecha DESC);
+    `);
+    if (secuencia) await tx.runAsync("UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'movimientos'", secuencia.seq);
     await tx.execAsync(`PRAGMA user_version = ${VERSION_ESQUEMA}`);
   });
 }

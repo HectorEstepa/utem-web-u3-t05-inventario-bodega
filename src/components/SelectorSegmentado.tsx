@@ -35,7 +35,6 @@ export function SelectorSegmentado<T extends string>({
             ]}
           >
             <Text
-              numberOfLines={1}
               style={[
                 s.texto,
                 { color: activo ? paleta.texto : paleta.textoSecundario },
@@ -54,13 +53,15 @@ export function SelectorSegmentado<T extends string>({
 const s = StyleSheet.create({
   contenedor: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     borderRadius: 11,
     padding: 3,
     gap: 3,
   },
   item: {
     flex: 1,
-    minHeight: 34,
+    minWidth: 65,
+    minHeight: 44,
     borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
@@ -77,6 +78,7 @@ const s = StyleSheet.create({
   },
   texto: {
     fontSize: 13,
+    textAlign: 'center',
     fontWeight: '500',
   },
   textoActivo: {

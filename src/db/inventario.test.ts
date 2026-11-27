@@ -11,6 +11,10 @@ import {
   obtenerResumenEjecutivo, registrarMovimiento, sembrarCatalogoDemo,
 } from './inventario.ts';
 import { esGtinValido } from '../lib/gtin.ts';
+import { obtenerEvolucion } from './evolucion.ts';
+import { cargarDatosReporte } from './reportes.ts';
+import { crearLibroReporte } from '../lib/reporteExcel.ts';
+import { resolverPeriodo, TODO_EL_HISTORIAL } from '../lib/periodo.ts';
 
 // Ejecuta las funciones de producción contra SQLite real de Node.
 // Este adaptador cubre SQL, transacciones y disco; no sustituye el puente nativo de Expo.
@@ -41,6 +45,80 @@ function adaptar(sql: DatabaseSync) {
 }
 
 const ficha = { codigo: '4006381333931', nombre: 'Producto de prueba', stockInicial: 10, minimo: 5, precio: 1290 };
+
+test('corregir cantidad conserva flujos y exporta saldos y motivo; valida y evita edición obsoleta', async () => {
+  const sql = new DatabaseSync(':memory:'); const db = adaptar(sql);
+  try {
+    await migrar(db); await crearProducto(db, ficha);
+    const editar = { ...ficha, stock: 7, stockAnterior: 10, motivo: 'Error al digitar alta', precio: 1500 };
+    await assert.rejects(actualizarProducto(db, { ...editar, motivo: '' }), /motivo/);
+    await assert.rejects(actualizarProducto(db, { ...editar, stock: -1 }), /entero/);
+    await assert.rejects(actualizarProducto(db, { ...editar, stock: 2.5 }), /entero/);
+    await actualizarProducto(db, editar);
+    assert.equal((await buscarPorCodigo(db, ficha.codigo))?.stock, 7);
+    let eventos = await historial(db, ficha.codigo);
+    assert.equal(eventos[0]?.tipo, 'ADJ');
+    assert.equal(eventos[0]?.stock_antes, 10); assert.equal(eventos[0]?.stock_despues, 7);
+    assert.equal(eventos[0]?.cantidad, 3);
+    const resumen = await obtenerResumenEjecutivo(db);
+    assert.equal(resumen.entradasUnidades, 10); assert.equal(resumen.salidasUnidades, 0);
+    assert.equal(resumen.entradasMontoCLP, 12900); assert.equal(resumen.valorInventarioCLP, 10500);
+    await assert.rejects(actualizarProducto(db, editar), /cambió/);
+    await actualizarProducto(db, { ...editar, stock: 7, stockAnterior: 7 });
+    assert.equal((await historial(db, ficha.codigo)).length, 2);
+    await actualizarProducto(db, { ...editar, stock: 0, stockAnterior: 7 });
+    await actualizarProducto(db, { ...editar, stock: 5, stockAnterior: 0 });
+    const d = await cargarDatosReporte(db, TODO_EL_HISTORIAL);
+    const ws = crearLibroReporte(d).Sheets.Movimientos!;
+    assert.equal(ws.D7.v, 'AJUSTE'); assert.equal(ws.L7.v, 0); assert.equal(ws.M7.v, 5);
+    assert.equal(ws.N7.v, 5); assert.equal(ws.J7.v, editar.motivo); assert.equal(ws.I7?.f, undefined);
+    // La ficha y el asiento se revierten juntos si el almacenamiento falla.
+    sql.exec("CREATE TRIGGER fallo_ajuste BEFORE INSERT ON movimientos WHEN NEW.tipo='ADJ' BEGIN SELECT RAISE(ABORT,'fallo simulado'); END;");
+    await assert.rejects(actualizarProducto(db, { ...editar, nombre: 'No guardar', stock: 9, stockAnterior: 5 }), /fallo simulado/);
+    assert.equal((await buscarPorCodigo(db, ficha.codigo))?.stock, 5);
+    assert.equal((await buscarPorCodigo(db, ficha.codigo))?.nombre, ficha.nombre);
+  } finally { sql.close(); }
+});
+
+test('evolución completa días sin actividad, suma flujos y excluye ajustes y límites externos', async () => {
+  const sql = new DatabaseSync(':memory:'); const db = adaptar(sql);
+  try {
+    await migrar(db); await crearProducto(db, { ...ficha, stockInicial: 0 });
+    const p = resolverPeriodo({ modo: 'rango', desde: '2026-11-01', hasta: '2026-11-03' });
+    const insertar = sql.prepare('INSERT INTO movimientos(codigo,tipo,cantidad,fecha) VALUES(?,?,?,?)');
+    insertar.run(ficha.codigo, 'IN', 8, p.desde!); insertar.run(ficha.codigo, 'IN', 2, p.desde! + 100);
+    insertar.run(ficha.codigo, 'OUT', 3, new Date(2026, 10, 3, 12).getTime());
+    insertar.run(ficha.codigo, 'IN', 99, p.hasta!);
+    sql.prepare("INSERT INTO movimientos(codigo,tipo,cantidad,nota,fecha,stock_antes,stock_despues) VALUES(?,'ADJ',4,'Conteo',?,0,4)").run(ficha.codigo, p.desde!);
+    const serie = await obtenerEvolucion(db, p);
+    assert.deepEqual(serie.puntos.map((v) => [v.entradas, v.salidas]), [[10, 0], [0, 0], [0, 3]]);
+    assert.equal(serie.puntos.at(-1)?.hasta, p.hasta);
+    const anual = await obtenerEvolucion(db, resolverPeriodo({ modo: 'rango', desde: '2026-01-01', hasta: '2026-12-31' }));
+    assert.equal(anual.agrupacion, 'mes'); assert.equal(anual.puntos.length, 12);
+    assert.equal(anual.puntos[10]?.entradas, 109);
+    const largo = await obtenerEvolucion(db, resolverPeriodo({ modo: 'rango', desde: '2010-01-01', hasta: '2026-12-31' }));
+    assert.equal(largo.agrupacion, 'año'); assert.equal(largo.puntos.length, 17);
+  } finally { sql.close(); }
+});
+
+test('migra v2 a v3 conservando IDs, secuencia incluso eliminados y cascada', async () => {
+  const sql = new DatabaseSync(':memory:'); const db = adaptar(sql);
+  try {
+    sql.exec(`CREATE TABLE productos(codigo TEXT PRIMARY KEY,nombre TEXT,stock INTEGER,minimo INTEGER,precio INTEGER,creado_en INTEGER);
+      CREATE TABLE movimientos(id INTEGER PRIMARY KEY AUTOINCREMENT,codigo TEXT REFERENCES productos(codigo) ON DELETE CASCADE,tipo TEXT CHECK(tipo IN ('IN','OUT')),cantidad INTEGER,precio_unitario INTEGER,nota TEXT,fecha INTEGER);
+      INSERT INTO productos VALUES('4006381333931','Producto',10,5,1290,1);
+      INSERT INTO movimientos VALUES(17,'4006381333931','IN',10,1290,'Original',1);
+      INSERT INTO movimientos VALUES(99,'4006381333931','OUT',1,1290,'Eliminado',2);
+      DELETE FROM movimientos WHERE id=99; PRAGMA user_version=2;`);
+    await migrar(db); await migrar(db);
+    await actualizarProducto(db, { ...ficha, stock: 8, stockAnterior: 10, motivo: 'Error', precio: 1290 });
+    const filas = await historial(db, ficha.codigo);
+    assert.equal(filas[0]?.id, 100); assert.equal(filas[1]?.id, 17); assert.equal(filas[1]?.nota, 'Original');
+    assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length, 0);
+    sql.prepare('DELETE FROM productos WHERE codigo=?').run(ficha.codigo);
+    assert.equal((await historial(db, ficha.codigo)).length, 0);
+  } finally { sql.close(); }
+});
 
 test('persiste alta, entrada, salida e historial al cerrar y reabrir el archivo', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'bodega-'));

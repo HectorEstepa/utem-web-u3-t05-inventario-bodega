@@ -2,6 +2,18 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fechaLocal, leerFechaLocal, resolverPeriodo, seleccionInicial } from './periodo.ts';
 
+test('ventanas móviles de meses acotan fin de mes y cruzan años sin desbordar febrero', () => {
+  const s = seleccionInicial();
+  const p = resolverPeriodo({ ...s, modo: '3meses' }, new Date(2026, 4, 31));
+  assert.equal(p.desde, new Date(2026, 2, 1).getTime());
+  assert.equal(p.hasta, new Date(2026, 5, 1).getTime());
+  const seis = resolverPeriodo({ ...s, modo: '6meses' }, new Date(2026, 0, 15));
+  assert.equal(seis.desde, new Date(2025, 6, 16).getTime());
+  const anual = resolverPeriodo({ ...s, modo: '1ano' }, new Date(2024, 1, 29));
+  assert.equal(anual.desde, new Date(2023, 2, 1).getTime());
+  assert.equal(anual.hasta, new Date(2024, 2, 1).getTime());
+});
+
 test('mes y año completos, febrero bisiesto y cambios de año', () => {
   const ahora = new Date(2024, 1, 15, 12);
   const mes = resolverPeriodo(seleccionInicial(ahora), ahora);

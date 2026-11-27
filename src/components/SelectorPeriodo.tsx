@@ -7,7 +7,7 @@ import { usePeriodo } from '../periodo';
 import { useTema } from '../theme';
 import { Boton } from './Boton';
 
-const OPCIONES: Array<[ModoPeriodo, string]> = [['hoy', 'Hoy'], ['7dias', '7 días'], ['30dias', '30 días'], ['mes', 'Mes'], ['ano', 'Año'], ['todo', 'Todo'], ['rango', 'Elegir fechas']];
+const OPCIONES: Array<[ModoPeriodo, string]> = [['hoy', 'Hoy'], ['7dias', '7 días'], ['30dias', '1M'], ['3meses', '3M'], ['6meses', '6M'], ['1ano', '1A'], ['mes', 'Este mes'], ['ano', 'Este año'], ['todo', 'Todo'], ['rango', 'Elegir fechas']];
 
 export function SelectorPeriodo() {
   const { seleccion, periodo, cambiar } = usePeriodo();
@@ -26,7 +26,7 @@ export function SelectorPeriodo() {
   return (
     <View style={[s.caja, { backgroundColor: paleta.superficie, borderColor: paleta.borde }]}>
       <Text style={[s.titulo, { color: paleta.texto }]}>Período de movimientos</Text>
-      <View style={s.opciones}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.opciones}>
         {OPCIONES.map(([modo, texto]) => (
           <Pressable key={modo} accessibilityRole="button" accessibilityState={{ selected: seleccion.modo === modo }}
             onPress={() => modo === 'rango' ? elegir() : cambiar({ ...seleccion, modo })}
@@ -34,7 +34,7 @@ export function SelectorPeriodo() {
             <Text style={{ color: seleccion.modo === modo ? paleta.acento : paleta.texto, fontWeight: '700' }}>{texto}</Text>
           </Pressable>
         ))}
-      </View>
+      </ScrollView>
       <Text style={{ color: paleta.texto, fontWeight: '600' }}>{periodo.etiqueta}</Text>
       <Text style={{ color: paleta.textoSecundario }}>{periodo.detalle}</Text>
       <Text style={{ color: paleta.textoTerciario, fontSize: 12 }}>Hora local del teléfono · stock y alertas siempre actuales</Text>
@@ -68,6 +68,6 @@ export function SelectorPeriodo() {
 
 const s = StyleSheet.create({
   caja: { padding: 14, borderWidth: StyleSheet.hairlineWidth, borderRadius: 18, gap: 8 },
-  titulo: { fontSize: 18, fontWeight: '800' }, opciones: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  titulo: { fontSize: 18, fontWeight: '800' }, opciones: { flexDirection: 'row', gap: 6 },
   chip: { minHeight: 44, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 12, justifyContent: 'center' },
 });

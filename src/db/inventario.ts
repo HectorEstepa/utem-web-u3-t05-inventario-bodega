@@ -15,7 +15,9 @@ export interface Producto {
 export interface Movimiento {
   id: number;
   codigo: string;
-  tipo: 'IN' | 'OUT';
+  tipo: 'IN' | 'OUT' | 'ADJ';
+  stock_antes?: number | null;
+  stock_despues?: number | null;
   cantidad: number;
   precio_unitario: number;
   nota: string;
@@ -156,7 +158,7 @@ export async function crearProducto(
 
 export async function actualizarProducto(
   db: SQLiteDatabase,
-  datos: { codigo: string; nombre: string; minimo: number; precio: number }
+  datos: { codigo: string; nombre: string; minimo: number; precio: number; stock?: number; stockAnterior?: number; motivo?: string }
 ): Promise<void> {
   const { codigo, nombre, minimo, precio } = datos;
   if (!nombre.trim()) throw new Error('El nombre no puede quedar vacío.');
@@ -166,13 +168,26 @@ export async function actualizarProducto(
   const errPrecio = validarPrecio(precio);
   if (errPrecio) throw new Error(errPrecio);
 
-  await db.runAsync(
-    'UPDATE productos SET nombre = ?, minimo = ?, precio = ? WHERE codigo = ?',
-    nombre.trim(),
-    minimo,
-    precio,
-    codigo
-  );
+  if (datos.stock !== undefined && (!Number.isSafeInteger(datos.stock) || datos.stock < 0)) {
+    throw new Error('La cantidad corregida debe ser un entero no negativo y seguro.');
+  }
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    const anterior = await buscarPorCodigo(tx as SQLiteDatabase, codigo);
+    if (!anterior) throw new Error('El producto ya no existe.');
+    const stock = datos.stock ?? anterior.stock;
+    if (datos.stock !== undefined && datos.stockAnterior !== anterior.stock) {
+      throw new Error('El stock cambió mientras editabas. Cierra y vuelve a abrir la ficha antes de corregirlo.');
+    }
+    const cambiaStock = stock !== anterior.stock;
+    const motivo = datos.motivo?.trim() ?? '';
+    if (cambiaStock && (!motivo || motivo.length > 160)) throw new Error('Indica el motivo del ajuste (1 a 160 caracteres).');
+    await tx.runAsync('UPDATE productos SET nombre = ?, minimo = ?, precio = ?, stock = ? WHERE codigo = ?', nombre.trim(), minimo, precio, stock, codigo);
+    if (cambiaStock) await tx.runAsync(
+      `INSERT INTO movimientos(codigo,tipo,cantidad,precio_unitario,nota,fecha,stock_antes,stock_despues)
+       VALUES (?, 'ADJ', ?, ?, ?, ?, ?, ?)`,
+      codigo, Math.abs(stock - anterior.stock), anterior.precio, motivo, Date.now(), anterior.stock, stock
+    );
+  });
 }
 
 export async function eliminarProducto(db: SQLiteDatabase, codigo: string): Promise<void> {
@@ -251,7 +266,7 @@ export async function historial(
 }
 
 export interface OpcionesMovimientos {
-  tipo?: 'TODOS' | 'IN' | 'OUT';
+  tipo?: 'TODOS' | 'IN' | 'OUT' | 'ADJ';
   periodo?: Periodo;
   codigo?: string;
   busqueda?: string;

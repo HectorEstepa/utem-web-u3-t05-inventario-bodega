@@ -35,7 +35,7 @@ App Android/iOS para registrar recepción y despacho de productos desde un telé
 - `App.tsx` abre **`bodega.db`** mediante `SQLiteProvider`. Al primer uso se crean tablas y, en aperturas posteriores, se usa la misma base y se aplican migraciones si corresponden.
 - Vive en el **almacenamiento privado de la aplicación en ese teléfono**, dentro del directorio predeterminado de `expo-sqlite` (`defaultDatabaseDirectory`). La ruta absoluta depende del sistema y de la instalación; no es una carpeta del repositorio ni del computador.
 - En Expo Go está dentro del entorno de Expo Go para ese proyecto; en una APK o app iOS independiente pertenece a esa instalación. **Pasar de Expo Go a una app instalada no migra los datos automáticamente.**
-- `productos` conserva código, nombre, stock, mínimo, precio y fecha de alta; `movimientos` conserva entradas/salidas, cantidades, precio histórico, nota y fecha. Las preferencias visuales se guardan aparte con AsyncStorage.
+- `productos` conserva código, nombre, stock, mínimo, precio y fecha de alta; `movimientos` conserva entradas/salidas y ajustes, cantidades, precio histórico, motivo, fecha y saldos anterior/nuevo del ajuste. Las preferencias visuales se guardan aparte con AsyncStorage.
 - Los datos **no se suben a GitHub, Expo ni a un servidor de la empresa** por las operaciones del inventario. Iniciar sesión con la misma cuenta en dos teléfonos no comparte sus bases.
 - Cerrar la app o reiniciar el teléfono conserva los datos. Desinstalar, borrar datos de la app o usar **Vaciar toda la bodega** puede eliminarlos. No se garantiza recuperación mediante copias del sistema operativo.
 - No hay exportación/importación de respaldo de SQLite desde la interfaz. Excel es un reporte y **no permite restaurar la base en esta versión**.
@@ -140,11 +140,15 @@ El catálogo demo anterior podía contener `7801610001625` y `7802900001015`, cu
 
 ## Períodos, historial y reportes
 
-La versión 1.4.0 abre con **Este mes**. Antes de esta versión, las entradas y salidas eran acumulados de todo el historial. Ahora Dashboard permite elegir **Hoy, 7 días, 30 días, Mes, Año, Todo o Elegir fechas**, con calendario nativo para inicio y fin. El rango aparece escrito en pantalla; ambos extremos incluyen días completos en la zona horaria del teléfono.
+La versión 1.5.0 abre con **Este mes**. Antes de v1.4.0, las entradas y salidas eran acumulados de todo el historial. Dashboard ofrece una barra horizontal de períodos **Hoy, 7 días, 1M, 3M, 6M, 1A, Este mes, Este año, Todo y Elegir fechas**, con calendario nativo para inicio y fin. 1M son los últimos 30 días; 3M/6M/1A son ventanas móviles de meses, hasta hoy. Este mes/Este año incluyen el calendario completo. El rango aparece escrito en pantalla; ambos extremos incluyen días completos en la zona horaria del teléfono.
 
 El mismo filtro de sesión se comparte entre Inicio, Dashboard, historial y exportaciones de Ajustes. Inicio muestra el período y lleva al Dashboard para cambiarlo. Al reiniciar el proceso se vuelve al mes actual. Los presets se recalculan al cambiar de día o volver a primer plano. **Stock, valorización actual, críticos y top de existencias siempre representan el estado actual**; no se reconstruye el stock de una fecha pasada.
 
 Las entradas se identifican en verde y las salidas en violeta, sin significado de ganancia/pérdida. El rojo se reserva para errores, acciones destructivas y stock agotado. Los montos son unidades por precio registrado, no utilidades ni ventas cobradas.
+
+El gráfico de evolución se adapta al ancho del teléfono: entradas verdes con línea continua y salidas violetas con línea discontinua. Tocar o deslizar muestra el intervalo y sus unidades; las flechas y la vista Tabla permiten consultarlas sin arrastrar. Cada punto suma actividad del intervalo, **no es stock histórico, acumulado ni rendimiento financiero**. Hasta 120 días agrupa por día; hasta ocho años, por mes; períodos mayores, por año. Los intervalos vacíos valen cero y los extremos parciales se identifican con fechas exactas. Los ajustes quedan fuera de ambas series. Se usa [react-native-svg compatible con Expo Go](https://docs.expo.dev/versions/v58.0.0/sdk/svg/).
+
+**Corregir cantidad:** abrir una ficha → Editar → Cantidad disponible corregida → motivo obligatorio → Guardar cambios. La app guarda un `ADJ` con fecha, motivo y saldo anterior/nuevo, atómicamente con la ficha. No crea una entrada ni salida ni suma esos indicadores. Sin cambio de cantidad no genera ajuste. El historial permite filtrar Ajustes y el Excel muestra saldos y diferencia en Movimientos y un resumen de ajustes. El stock inicial sigue siendo la entrada original: corregirlo conserva ese registro y deja la diferencia como ajuste; no reescribe su cantidad ni su fecha. No hay identificación segura del operador ni bitácora inmutable.
 
 **Historial** tiene acceso desde Inicio, Dashboard y la ficha. Incluye búsqueda por nombre/código/nota, filtro de tipo y período, fecha completa, ID de operación y carga de 50 en 50. La ficha conserva cinco movimientos recientes de todo el historial; su botón abre la consulta con el período compartido visible.
 
@@ -181,7 +185,7 @@ npx expo install --check
 npx expo export --platform android --platform ios --output-dir dist
 ```
 
-Las 20 pruebas cubren GTIN, CLP, stock y SQLite real de Node: persistencia en disco, migración v1→v2, rollback, duplicados y datos inválidos. El adaptador no ejecuta Expo ni simula un teléfono. GitHub Actions repite estas verificaciones en push y pull request.
+Las 24 pruebas cubren GTIN, CLP, stock y SQLite real de Node: persistencia, migraciones v1/v2→v3, conservación de IDs/secuencia, rollback, ajustes sin alterar flujos, exportación de saldos, series con intervalos vacíos, ventanas de fechas, duplicados y datos inválidos. El adaptador no ejecuta Expo ni simula un teléfono. GitHub Actions repite estas verificaciones en push y pull request.
 
 ## APK para prueba física
 

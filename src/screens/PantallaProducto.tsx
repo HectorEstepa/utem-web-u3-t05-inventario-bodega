@@ -56,6 +56,8 @@ export function PantallaProducto({
   const [editNombre, setEditNombre] = useState('');
   const [editPrecio, setEditPrecio] = useState('0');
   const [editMinimo, setEditMinimo] = useState('5');
+  const [editStock, setEditStock] = useState('0');
+  const [motivoAjuste, setMotivoAjuste] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -72,6 +74,8 @@ export function PantallaProducto({
         setEditNombre(p.nombre);
         setEditPrecio(String(p.precio ?? 0));
         setEditMinimo(String(p.minimo));
+        setEditStock(String(p.stock));
+        setMotivoAjuste('');
         setMovs(await historial(db, codigo, 5));
       }
     } catch (e) {
@@ -150,7 +154,9 @@ export function PantallaProducto({
   };
 
   const guardarEdicion = async () => {
-    if (!producto || ocupado) return;
+    if (!producto || enVuelo.current) return;
+    if (!editStock.trim()) { setError('Indica la cantidad corregida; usa 0 si no hay unidades.'); return; }
+    enVuelo.current = true;
     Keyboard.dismiss();
     setOcupado(true);
     setError(null);
@@ -160,6 +166,7 @@ export function PantallaProducto({
         nombre: editNombre,
         minimo: Number(editMinimo),
         precio: Number(editPrecio || '0'),
+        stock: Number(editStock), stockAnterior: producto.stock, motivo: motivoAjuste,
       });
       setEditandoFicha(false);
       setAviso('Ficha del producto actualizada.');
@@ -167,6 +174,7 @@ export function PantallaProducto({
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al actualizar el producto.');
     } finally {
+      enVuelo.current = false;
       setOcupado(false);
     }
   };
@@ -284,7 +292,7 @@ export function PantallaProducto({
               {editandoFicha ? (
                 <View style={[s.panelEdicion, { borderTopColor: paleta.separador }]}>
                   <Text style={[s.rotulo, { color: paleta.textoSecundario }]}>
-                    EDITAR NOMBRE, PRECIO CLP Y MÍNIMO
+                    EDITAR PRODUCTO Y CORREGIR EXISTENCIAS
                   </Text>
                   <TextInput
                     value={editNombre}
@@ -324,6 +332,18 @@ export function PantallaProducto({
                       />
                     </View>
                   </View>
+                  <Text style={{ color: paleta.texto }}>Cantidad disponible corregida</Text>
+                  <TextInput value={editStock} onChangeText={(t) => setEditStock(t.replace(/[^0-9]/g, ''))}
+                    accessibilityLabel="Cantidad disponible corregida" keyboardType="number-pad" maxLength={16}
+                    style={[s.input, { backgroundColor: paleta.inputFondo, color: paleta.texto }]} />
+                  {Number(editStock) !== producto.stock ? <>
+                    <Text style={{ color: paleta.acento }}>Ajuste: {producto.stock} → {editStock || '…'} u. No suma entradas ni salidas.</Text>
+                    <TextInput value={motivoAjuste} onChangeText={setMotivoAjuste} maxLength={160}
+                      accessibilityLabel="Motivo obligatorio del ajuste" placeholder="Motivo obligatorio, ej.: error al ingresar cantidad"
+                      placeholderTextColor={paleta.textoTerciario}
+                      style={[s.input, { backgroundColor: paleta.inputFondo, color: paleta.texto }]} />
+                  </> : null}
+                  {error ? <Text accessibilityRole="alert" style={{ color: paleta.rojo }}>{error}</Text> : null}
                   <Boton
                     titulo="Guardar cambios"
                     onPress={guardarEdicion}
@@ -511,11 +531,10 @@ export function PantallaProducto({
                         <Text
                           style={[
                             s.movTipo,
-                            { color: esEntrada ? paleta.verde : paleta.salida },
+                            { color: m.tipo === 'ADJ' ? paleta.acento : esEntrada ? paleta.verde : paleta.salida },
                           ]}
                         >
-                          {esEntrada ? '▲ Entrada' : '▼ Salida'} · {esEntrada ? '+' : '−'}
-                          {m.cantidad} u.
+                          {m.tipo === 'ADJ' ? `↔ Ajuste · ${m.stock_antes} → ${m.stock_despues} u.` : `${esEntrada ? '▲ Entrada · +' : '▼ Salida · −'}${m.cantidad} u.`}
                         </Text>
                         <Text style={[s.movNota, { color: paleta.textoSecundario }]}>
                           {m.nota ? `${m.nota} · ` : ''}
@@ -529,7 +548,7 @@ export function PantallaProducto({
                         </Text>
                       </View>
                       <Text style={[s.movMonto, { color: paleta.texto }]}>
-                        {monto > 0 ? formatearCLP(monto) : '—'}
+                        {m.tipo === 'ADJ' ? 'Corrección' : monto > 0 ? formatearCLP(monto) : '—'}
                       </Text>
                     </View>
                   );

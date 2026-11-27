@@ -11,7 +11,7 @@ import { usePeriodo } from '../periodo';
 import { useTema } from '../theme';
 
 const TAMANO = 50;
-type Tipo = 'TODOS' | 'IN' | 'OUT';
+type Tipo = 'TODOS' | 'IN' | 'OUT' | 'ADJ';
 
 export function PantallaHistorial({ codigo, onVolver, onAbrirCodigo }: { codigo?: string; onVolver: () => void; onAbrirCodigo: (codigo: string) => void }) {
   const db = useSQLiteContext();
@@ -53,14 +53,15 @@ export function PantallaHistorial({ codigo, onVolver, onAbrirCodigo }: { codigo?
 
   return (
     <View style={{ flex: 1, backgroundColor: paleta.fondo }}>
-      <BarraSubpantalla titulo="Historial de movimientos" subtitulo={codigo ? `Producto ${codigo}` : 'Entradas y salidas de la bodega'} onVolver={onVolver} />
+      <BarraSubpantalla titulo="Historial de movimientos" subtitulo={codigo ? `Producto ${codigo}` : 'Entradas, salidas y ajustes de la bodega'} onVolver={onVolver} />
       <FlatList data={filas} keyExtractor={(m) => String(m.id)} keyboardShouldPersistTaps="handled" contentContainerStyle={s.lista}
         renderItem={({ item }) => <FilaMovimiento movimiento={item} onPress={onAbrirCodigo} />}
         ListHeaderComponent={<View style={{ gap: 12, marginBottom: 14 }}>
           <SelectorPeriodo />
           <TextInput value={texto} onChangeText={setTexto} placeholder="Buscar producto, código o nota" accessibilityLabel="Buscar movimientos"
             placeholderTextColor={paleta.textoTerciario} style={[s.input, { backgroundColor: paleta.inputFondo, color: paleta.texto }]} />
-          <SelectorSegmentado<Tipo> valor={tipo} onChange={setTipo} opciones={[{ valor: 'TODOS', etiqueta: 'Todos' }, { valor: 'IN', etiqueta: 'Entradas' }, { valor: 'OUT', etiqueta: 'Salidas' }]} />
+          <SelectorSegmentado<Tipo> valor={tipo} onChange={setTipo} opciones={[{ valor: 'TODOS', etiqueta: 'Todos' }, { valor: 'IN', etiqueta: 'Entradas' },
+                { valor: 'ADJ', etiqueta: 'Ajustes' }, { valor: 'OUT', etiqueta: 'Salidas' }]} />
           <Text style={{ color: paleta.textoSecundario }}>{cargando && !filas.length ? 'Consultando…' : `${filas.length} de ${total} movimientos · más recientes primero`}</Text>
         </View>}
         ListEmptyComponent={!cargando && !error ? <Text style={{ color: paleta.textoSecundario }}>No hay movimientos para estas fechas y filtros. Prueba con Todo o modifica la búsqueda.</Text> : undefined}

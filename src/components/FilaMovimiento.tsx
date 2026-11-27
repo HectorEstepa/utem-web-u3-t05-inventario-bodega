@@ -7,12 +7,12 @@ import { useTema } from '../theme';
 export function FilaMovimiento({ movimiento: m, onPress }: { movimiento: MovimientoDetallado; onPress: (codigo: string) => void }) {
   const { paleta } = useTema();
   const entrada = m.tipo === 'IN';
-  const color = entrada ? paleta.verde : paleta.salida;
+  const color = m.tipo === 'ADJ' ? paleta.acento : entrada ? paleta.verde : paleta.salida;
   return (
     <Pressable onPress={() => onPress(m.codigo)} accessibilityRole="button" style={[s.fila, { backgroundColor: paleta.superficie, borderColor: paleta.borde }]}>
       <View style={s.encabezado}>
-        <Text style={[s.tipo, { color }]}>{entrada ? '↙ Entrada' : '↗ Salida'} · {m.cantidad} u.</Text>
-        <Text style={{ color: paleta.texto, fontWeight: '700' }}>{formatearCLP(m.cantidad * m.precio_unitario)}</Text>
+        <Text style={[s.tipo, { color }]}>{m.tipo === 'ADJ' ? `↔ Ajuste · ${m.stock_antes} → ${m.stock_despues} u.` : `${entrada ? '↙ Entrada' : '↗ Salida'} · ${m.cantidad} u.`}</Text>
+        <Text style={{ color: paleta.texto, fontWeight: '700' }}>{m.tipo === 'ADJ' ? 'Corrección' : formatearCLP(m.cantidad * m.precio_unitario)}</Text>
       </View>
       <Text style={{ color: paleta.texto, fontWeight: '700', fontSize: 16 }}>{m.nombre_producto}</Text>
       <Text style={{ color: paleta.textoSecundario }}>GTIN {m.codigo} · operación #{m.id}</Text>

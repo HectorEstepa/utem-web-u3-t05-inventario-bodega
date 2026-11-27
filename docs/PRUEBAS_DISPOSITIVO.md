@@ -63,3 +63,14 @@ En el informe explicar:
 - Qué decisión apoyan los resultados y qué límites tuvo el experimento. Si no coinciden con la hipótesis, informar lo observado.
 
 Un fallo también es evidencia: registrar mensaje, pasos para reproducir, intentos y limitación restante.
+
+## Casos nuevos v1.5.0 (pendientes en dispositivo)
+
+| Caso | Acción | Resultado esperado | Estado |
+| --- | --- | --- | --- |
+| P22 | En pantalla de 320–390 px, deslizar períodos y cambiar 1M/3M/6M/1A/Todo | Fechas visibles; gráfico se adapta; Inicio comparte rango | Pendiente |
+| P23 | Tocar y arrastrar líneas; comparar con Tabla y flechas | Coinciden fechas y unidades; sin bloqueo del scroll fuera del gráfico | Pendiente |
+| P24 | Rango vacío, un solo día, período >120 días y >8 años | Ceros válidos, un punto utilizable, agrupación día/mes/año explícita | Pendiente |
+| P25 | Editar cantidad 10→8 con motivo; luego 8→0 y 0→5 | Stock actualizado; Ajuste con saldos, motivo y fecha; entradas/salidas sin cambio | Pendiente |
+| P26 | Guardar sin motivo, cantidad vacía, cancelar, guardar sin variar cantidad y doble toque | Error legible sin cambios parciales; cancelar/sin diferencia no crean ajuste; doble toque no duplica | Pendiente |
+| P27 | Actualizar sobre v2 con datos; exportar corrección y abrir Excel | Se conservan fichas/IDs; AJUSTE con saldos, motivo, diferencia y sin subtotal de flujo; probar ambos temas y lector de pantalla | Pendiente |

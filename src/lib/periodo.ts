@@ -1,4 +1,4 @@
-export type ModoPeriodo = 'hoy' | '7dias' | '30dias' | 'mes' | 'ano' | 'todo' | 'rango';
+export type ModoPeriodo = 'hoy' | '3meses' | '6meses' | '1ano' | '7dias' | '30dias' | 'mes' | 'ano' | 'todo' | 'rango';
 export interface SeleccionPeriodo { modo: ModoPeriodo; desde: string; hasta: string }
 export interface Periodo {
   desde: number | null;
@@ -30,6 +30,14 @@ export function resolverPeriodo(s: SeleccionPeriodo, ahora = new Date()): Period
   let inicio = new Date(y, m, d), fin = new Date(y, m, d);
   let etiqueta = 'Hoy';
   switch (s.modo) {
+    case '3meses': case '6meses': case '1ano': {
+      const meses = s.modo === '3meses' ? 3 : s.modo === '6meses' ? 6 : 12;
+      // Ventana móvil por meses, acotada al último día válido del mes destino.
+      const ultimo = new Date(y, m - meses + 1, 0).getDate();
+      inicio = new Date(y, m - meses, Math.min(d, ultimo));
+      inicio.setDate(inicio.getDate() + 1);
+      etiqueta = `Últimos ${meses === 12 ? '12' : meses} meses`; break;
+    }
     case '7dias': inicio = new Date(y, m, d - 6); etiqueta = 'Últimos 7 días'; break;
     case '30dias': inicio = new Date(y, m, d - 29); etiqueta = 'Últimos 30 días'; break;
     case 'mes': inicio = new Date(y, m, 1); fin = new Date(y, m + 1, 0); etiqueta = 'Este mes'; break;

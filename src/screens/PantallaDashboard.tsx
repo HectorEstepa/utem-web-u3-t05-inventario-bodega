@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { GraficoEvolucion } from '../components/GraficoEvolucion';
+import { obtenerEvolucion, type Evolucion } from '../db/evolucion';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Boton } from '../components/Boton';
@@ -18,7 +20,7 @@ import { FilaMovimiento } from '../components/FilaMovimiento';
 import { usePeriodo } from '../periodo';
 import { useTema } from '../theme';
 
-type FiltroMov = 'TODOS' | 'OUT' | 'IN';
+type FiltroMov = 'TODOS' | 'OUT' | 'IN' | 'ADJ';
 
 /**
  * Dashboard Ejecutivo y Técnico:
@@ -39,6 +41,7 @@ export function PantallaDashboard({
 }) {
   const db = useSQLiteContext();
   const { periodo } = usePeriodo();
+  const [evolucion, setEvolucion] = useState<Evolucion>({ puntos: [], agrupacion: 'día' });
   const [actualizado, setActualizado] = useState(() => new Date());
   const { paleta } = useTema();
   const [resumen, setResumen] = useState<ResumenEjecutivo | null>(null);
@@ -55,12 +58,14 @@ export function PantallaDashboard({
     setCargando(true);
     try {
       setError(null);
-      const [res, movs] = await Promise.all([
+      const [res, movs, serie] = await Promise.all([
         obtenerResumenEjecutivo(db, periodo),
         listarMovimientosGlobales(db, { tipo: filtroMov, periodo, limite: 5 }),
+        obtenerEvolucion(db, periodo),
       ]);
       if (consulta !== ultimaConsulta.current) return;
       setResumen(res);
+      setEvolucion(serie);
       setActualizado(new Date());
       setMovimientos(movs);
     } catch (e) {
@@ -136,6 +141,7 @@ export function PantallaDashboard({
       </View>
 
       <SelectorPeriodo />
+      <GraficoEvolucion key={periodo.detalle} datos={evolucion} />
       {periodo.desde === null && resumen.primeraFecha !== null && resumen.ultimaFecha !== null ? (
         <Text style={{ color: paleta.textoSecundario }}>Registros incluidos: {new Date(resumen.primeraFecha).toLocaleString('es-CL')} — {new Date(resumen.ultimaFecha).toLocaleString('es-CL')}</Text>
       ) : null}
@@ -329,6 +335,7 @@ export function PantallaDashboard({
                 { valor: 'TODOS', etiqueta: 'Todos' },
                 { valor: 'OUT', etiqueta: 'Salidas' },
                 { valor: 'IN', etiqueta: 'Entradas' },
+                { valor: 'ADJ', etiqueta: 'Ajustes' },
               ]}
             />
 
