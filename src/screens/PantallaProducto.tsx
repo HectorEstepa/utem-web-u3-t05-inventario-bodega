@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { BarraSubpantalla } from '../components/BarraSubpantalla';
+import { SelectorSegmentado } from '../components/SelectorSegmentado';
+import { ElegirEntradaCorreccion } from '../components/ElegirEntradaCorreccion';
 import { Boton } from '../components/Boton';
 import { Cargando, ErrorEstado, Vacio } from '../components/Estados';
 import {
@@ -58,6 +60,8 @@ export function PantallaProducto({
   const [editMinimo, setEditMinimo] = useState('5');
   const [editStock, setEditStock] = useState('0');
   const [motivoAjuste, setMotivoAjuste] = useState('');
+  const [modoCorreccion, setModoCorreccion] = useState<'entrada' | 'conteo'>('entrada');
+  const [entradaCorregir, setEntradaCorregir] = useState<Movimiento | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -76,6 +80,8 @@ export function PantallaProducto({
         setEditMinimo(String(p.minimo));
         setEditStock(String(p.stock));
         setMotivoAjuste('');
+        setEntradaCorregir(null);
+        setModoCorreccion('entrada');
         setMovs(await historial(db, codigo, 5));
       }
     } catch (e) {
@@ -156,6 +162,7 @@ export function PantallaProducto({
   const guardarEdicion = async () => {
     if (!producto || enVuelo.current) return;
     if (!editStock.trim()) { setError('Indica la cantidad corregida; usa 0 si no hay unidades.'); return; }
+    if (Number(editStock) !== producto.stock && modoCorreccion === 'entrada' && !entradaCorregir) { setError('Selecciona la entrada que quedó mal registrada.'); return; }
     enVuelo.current = true;
     Keyboard.dismiss();
     setOcupado(true);
@@ -167,6 +174,7 @@ export function PantallaProducto({
         minimo: Number(editMinimo),
         precio: Number(editPrecio || '0'),
         stock: Number(editStock), stockAnterior: producto.stock, motivo: motivoAjuste,
+        correccionEntrada: modoCorreccion === 'entrada' && entradaCorregir ? { id: entradaCorregir.id, cantidadAnterior: entradaCorregir.cantidad } : undefined,
       });
       setEditandoFicha(false);
       setAviso('Ficha del producto actualizada.');
@@ -337,7 +345,13 @@ export function PantallaProducto({
                     accessibilityLabel="Cantidad disponible corregida" keyboardType="number-pad" maxLength={16}
                     style={[s.input, { backgroundColor: paleta.inputFondo, color: paleta.texto }]} />
                   {Number(editStock) !== producto.stock ? <>
-                    <Text style={{ color: paleta.acento }}>Ajuste: {producto.stock} → {editStock || '…'} u. No suma entradas ni salidas.</Text>
+                    <SelectorSegmentado valor={modoCorreccion} onChange={setModoCorreccion} opciones={[
+                      { valor: 'entrada', etiqueta: 'Corregir entrada' }, { valor: 'conteo', etiqueta: 'Ajuste de conteo' },
+                    ]} />
+                    <Text style={{ color: paleta.acento }}>Stock: {producto.stock} → {editStock || '…'} u. No registra ninguna salida.</Text>
+                    {modoCorreccion === 'entrada' ? <ElegirEntradaCorreccion codigo={codigo} seleccion={entradaCorregir}
+                      onElegir={setEntradaCorregir} diferencia={Number(editStock) - producto.stock} /> :
+                      <Text style={{ color: paleta.textoSecundario }}>Ajuste físico: cambia solo el saldo disponible; conserva los totales de entradas y salidas.</Text>}
                     <TextInput value={motivoAjuste} onChangeText={setMotivoAjuste} maxLength={160}
                       accessibilityLabel="Motivo obligatorio del ajuste" placeholder="Motivo obligatorio, ej.: error al ingresar cantidad"
                       placeholderTextColor={paleta.textoTerciario}
@@ -537,6 +551,8 @@ export function PantallaProducto({
                           {m.tipo === 'ADJ' ? `↔ Ajuste · ${m.stock_antes} → ${m.stock_despues} u.` : `${esEntrada ? '▲ Entrada · +' : '▼ Salida · −'}${m.cantidad} u.`}
                         </Text>
                         <Text style={[s.movNota, { color: paleta.textoSecundario }]}>
+                          {m.entrada_corregida_id ? `Corrección entrada #${m.entrada_corregida_id}: ${m.entrada_cantidad_antes} → ${m.entrada_cantidad_despues} u. · ` : ''}
+                          {m.tipo === 'IN' && m.cantidad_original !== m.cantidad ? `Original: ${m.cantidad_original} u. · ` : ''}
                           {m.nota ? `${m.nota} · ` : ''}
                           {new Date(m.fecha).toLocaleString('es-CL', {
                             day: '2-digit',

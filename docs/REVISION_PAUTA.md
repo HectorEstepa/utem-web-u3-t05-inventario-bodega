@@ -61,3 +61,7 @@ La auditoría npm detectó tres avisos moderados derivados de `minimatch` a trav
 ## Revisión v1.5.0: evolución y correcciones de cantidad
 
 Gráfico nativo adaptable con selección táctil, tabla, fechas y períodos móviles. Ajustes ADJ desde Editar, motivo obligatorio y saldos anterior/nuevo, sin inflar flujos. Esquema v3 conserva IDs y secuencia; guardado atómico con protección ante saldo obsoleto. Excel incluye correcciones sin valorizarlas como recepción/despacho. Suite de 24 pruebas y exportación Android/iOS; interacción física pendiente, ver P22–P27.
+
+## Rectificaciones v1.6.0
+
+Corregir entrada rectifica cantidad vigente de una recepción elegida y stock en la misma transacción, conservando cantidad original, fecha, precio y constancia vinculada. No crea OUT. Las consultas de resumen, series y Excel usan la cantidad efectiva; la corrección afecta el período original. Ajuste de conteo conserva la semántica previa, separado de rectificaciones. Esquema v4 añade campos sin reconstruir v3 ni perder sus ajustes. Suite: 27 pruebas, con caso 20→15→20→0, despachos existentes, precio histórico, XLSX, rollback y migración v3→v4. Pruebas físicas pendientes P28–P34.

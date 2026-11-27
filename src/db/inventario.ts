@@ -19,6 +19,10 @@ export interface Movimiento {
   stock_antes?: number | null;
   stock_despues?: number | null;
   cantidad: number;
+  cantidad_original?: number;
+  entrada_corregida_id?: number | null;
+  entrada_cantidad_antes?: number | null;
+  entrada_cantidad_despues?: number | null;
   precio_unitario: number;
   nota: string;
   fecha: number;
@@ -158,7 +162,7 @@ export async function crearProducto(
 
 export async function actualizarProducto(
   db: SQLiteDatabase,
-  datos: { codigo: string; nombre: string; minimo: number; precio: number; stock?: number; stockAnterior?: number; motivo?: string }
+  datos: { codigo: string; nombre: string; minimo: number; precio: number; stock?: number; stockAnterior?: number; motivo?: string; correccionEntrada?: { id: number; cantidadAnterior: number } }
 ): Promise<void> {
   const { codigo, nombre, minimo, precio } = datos;
   if (!nombre.trim()) throw new Error('El nombre no puede quedar vacío.');
@@ -181,11 +185,29 @@ export async function actualizarProducto(
     const cambiaStock = stock !== anterior.stock;
     const motivo = datos.motivo?.trim() ?? '';
     if (cambiaStock && (!motivo || motivo.length > 160)) throw new Error('Indica el motivo del ajuste (1 a 160 caracteres).');
+    let entrada: Movimiento | null = null;
+    let nuevaCantidadEntrada: number | null = null;
+    if (cambiaStock && datos.correccionEntrada) {
+      entrada = await tx.getFirstAsync<Movimiento>(
+        `SELECT ${COLUMNAS_MOVIMIENTO} FROM movimientos m WHERE m.id = ? AND m.codigo = ? AND m.tipo = 'IN'`,
+        datos.correccionEntrada.id, codigo
+      );
+      if (!entrada || entrada.cantidad !== datos.correccionEntrada.cantidadAnterior) {
+        throw new Error('La entrada cambió o ya no existe. Vuelve a seleccionarla antes de corregir.');
+      }
+      nuevaCantidadEntrada = entrada.cantidad + stock - anterior.stock;
+      if (!Number.isSafeInteger(nuevaCantidadEntrada) || nuevaCantidadEntrada < 0) {
+        throw new Error('La corrección dejaría esa entrada con cantidad negativa. Revisa la entrada elegida y el stock correcto.');
+      }
+      await tx.runAsync('UPDATE movimientos SET cantidad_corregida = ? WHERE id = ?', nuevaCantidadEntrada, entrada.id);
+    }
     await tx.runAsync('UPDATE productos SET nombre = ?, minimo = ?, precio = ?, stock = ? WHERE codigo = ?', nombre.trim(), minimo, precio, stock, codigo);
     if (cambiaStock) await tx.runAsync(
-      `INSERT INTO movimientos(codigo,tipo,cantidad,precio_unitario,nota,fecha,stock_antes,stock_despues)
-       VALUES (?, 'ADJ', ?, ?, ?, ?, ?, ?)`,
-      codigo, Math.abs(stock - anterior.stock), anterior.precio, motivo, Date.now(), anterior.stock, stock
+      `INSERT INTO movimientos(codigo,tipo,cantidad,precio_unitario,nota,fecha,stock_antes,stock_despues,
+         entrada_corregida_id,entrada_cantidad_antes,entrada_cantidad_despues)
+       VALUES (?, 'ADJ', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      codigo, Math.abs(stock - anterior.stock), entrada?.precio_unitario ?? anterior.precio, motivo, Date.now(), anterior.stock, stock,
+      entrada?.id ?? null, entrada?.cantidad ?? null, nuevaCantidadEntrada
     );
   });
 }
@@ -253,13 +275,19 @@ export async function registrarMovimiento(
   return stockFinal;
 }
 
+/** Cantidad efectiva para consultas; la original se conserva para auditoría. */
+export const CANTIDAD_EFECTIVA = 'COALESCE(m.cantidad_corregida, m.cantidad)';
+export const COLUMNAS_MOVIMIENTO = `m.id,m.codigo,m.tipo,${CANTIDAD_EFECTIVA} AS cantidad,
+  m.cantidad AS cantidad_original,m.precio_unitario,m.nota,m.fecha,m.stock_antes,m.stock_despues,
+  m.entrada_corregida_id,m.entrada_cantidad_antes,m.entrada_cantidad_despues`;
+
 export async function historial(
   db: SQLiteDatabase,
   codigo: string,
   limite = 25
 ): Promise<Movimiento[]> {
   return db.getAllAsync<Movimiento>(
-    'SELECT * FROM movimientos WHERE codigo = ? ORDER BY fecha DESC, id DESC LIMIT ?',
+    `SELECT ${COLUMNAS_MOVIMIENTO} FROM movimientos m WHERE codigo = ? ORDER BY fecha DESC, id DESC LIMIT ?`,
     codigo,
     limite
   );
@@ -302,7 +330,7 @@ export async function listarMovimientosGlobales(
   const limite = opciones.limite ?? 50;
   if (!Number.isInteger(limite) || limite < 1 || limite > 20000) throw new Error('Límite de consulta inválido.');
   return db.getAllAsync<MovimientoDetallado>(
-    `SELECT m.*, COALESCE(p.nombre, m.codigo) AS nombre_producto
+    `SELECT ${COLUMNAS_MOVIMIENTO}, COALESCE(p.nombre, m.codigo) AS nombre_producto
      FROM movimientos m LEFT JOIN productos p ON p.codigo = m.codigo
      ${where} ORDER BY m.fecha DESC, m.id DESC LIMIT ?`, ...params, limite
   );
@@ -353,10 +381,10 @@ export async function obtenerResumenEjecutivo(db: SQLiteDatabase, periodo: Perio
         COUNT(*) AS totalMovimientos,
         MIN(fecha) AS primeraFecha,
         MAX(fecha) AS ultimaFecha,
-        COALESCE(SUM(CASE WHEN tipo = 'IN' THEN cantidad ELSE 0 END), 0) AS entradasUnidades,
-        COALESCE(SUM(CASE WHEN tipo = 'IN' THEN cantidad * precio_unitario ELSE 0 END), 0) AS entradasMontoCLP,
-        COALESCE(SUM(CASE WHEN tipo = 'OUT' THEN cantidad ELSE 0 END), 0) AS salidasUnidades,
-        COALESCE(SUM(CASE WHEN tipo = 'OUT' THEN cantidad * precio_unitario ELSE 0 END), 0) AS salidasMontoCLP
+        COALESCE(SUM(CASE WHEN tipo = 'IN' THEN ${CANTIDAD_EFECTIVA} ELSE 0 END), 0) AS entradasUnidades,
+        COALESCE(SUM(CASE WHEN tipo = 'IN' THEN ${CANTIDAD_EFECTIVA} * precio_unitario ELSE 0 END), 0) AS entradasMontoCLP,
+        COALESCE(SUM(CASE WHEN tipo = 'OUT' THEN ${CANTIDAD_EFECTIVA} ELSE 0 END), 0) AS salidasUnidades,
+        COALESCE(SUM(CASE WHEN tipo = 'OUT' THEN ${CANTIDAD_EFECTIVA} * precio_unitario ELSE 0 END), 0) AS salidasMontoCLP
       FROM movimientos m ${where}
     `, ...params),
     db.getAllAsync<{

@@ -1,6 +1,6 @@
 # Manual de usuario: inventario de bodega
 
-Aplicación v1.5.1. Dirigido al encargado y al operador de una bodega. Describe la versión actual: inventario local, un teléfono como registro operativo y cantidades enteras. No incluye sincronización, facturación ni respaldo/restauración.
+Aplicación v1.6.0. Dirigido al encargado y al operador de una bodega. Describe la versión actual: inventario local, un teléfono como registro operativo y cantidades enteras. No incluye sincronización, facturación ni respaldo/restauración.
 
 ## 1. Qué se entrega al operador
 
@@ -66,7 +66,7 @@ Son alertas visuales dentro de la app. No se envían correos, avisos push, pedid
 ## 7. Buscar, editar y consultar historial
 
 - En **Inventario**, escribir parte del nombre o código. Probar **Todos**, **Críticos** y **Agotados** según la tarea.
-- Abrir la ficha y usar **Editar** para cambiar nombre, precio, mínimo o corregir la cantidad. La corrección genera un Ajuste separado de entradas/salidas; ver sección 8.
+- Abrir la ficha y usar **Editar** para cambiar nombre, precio, mínimo o corregir la cantidad. Elegir Corregir entrada para rectificar una recepción mal digitada o Ajuste de conteo para una diferencia física; ver sección 8.
 - Al modificar el precio, los movimientos anteriores conservan el precio unitario que tenían al registrarse. La valorización del inventario usa el precio actual.
 - La ficha muestra los cinco movimientos más recientes de todo el historial. Su botón abre una pantalla dedicada para buscar y elegir fechas. Inicio y Dashboard también tienen acceso al historial, paginado de 50 en 50.
 - La app no identifica al trabajador que hizo cada movimiento y no impide editar/eliminar datos por rol. Para un piloto, el encargado debe definir quién puede operar el teléfono.
@@ -86,18 +86,23 @@ La selección es de sesión: al reiniciar el proceso vuelve al mes actual. Las s
 
 ## 8. Equivocaciones y diferencias de conteo
 
-Para corregir una cantidad mal digitada o una diferencia de conteo comprobada:
+Para corregir una **entrada mal digitada**:
 
-1. Investigar el error y confirmar con el encargado la cantidad física correcta. Una recepción o despacho real sigue usando Entrada o Salida.
-2. Abrir **Inventario → producto → Editar**.
-3. Cambiar **Cantidad disponible corregida**, incluyendo 0 si está agotado. Revisar la vista previa «saldo anterior → nuevo».
-4. Escribir el **motivo obligatorio** (hasta 160 caracteres), por ejemplo «Error al ingresar cantidad inicial; conteo confirmado».
-5. Tocar **Guardar cambios**. Revisar el nuevo saldo y la fila **Ajuste** en el historial. Si la cantidad no cambió, no se crea un ajuste.
-6. Si el stock cambió mientras se editaba, la app rechaza la corrección: volver a la lista, abrir de nuevo la ficha y revisar el saldo actualizado.
+1. Confirmar la cantidad que realmente se recibió e identificar la entrada equivocada.
+2. Abrir **Inventario → producto → Editar** y escribir la **Cantidad disponible corregida** (saldo que debe quedar hoy).
+3. Dejar seleccionada **Corregir entrada**. Tocar **Elegir la entrada que quiero corregir** y seleccionar la recepción por fecha, ID y nota. Se pueden cargar más entradas, sin restringirse al período del Dashboard.
+4. Revisar ambas vistas previas: cantidad anterior/nueva de esa entrada y stock anterior/nuevo. Escribir el motivo obligatorio, de hasta 160 caracteres.
+5. **Guardar cambios**. La entrada rectificada cambia los totales de recepción y el stock; no crea salidas. Se conserva el original y una constancia vinculada en Historial → Ajustes, con fecha y motivo.
 
-Ejemplo: al crear el producto se digitó 10, pero eran 8. Editar la cantidad a 8 guarda un Ajuste de 10 → 8, diferencia −2. No crea una salida ni cambia los indicadores de entradas/salidas. La entrada inicial de 10 se conserva como fue registrada; el ajuste documenta la corrección por separado. Por eso entradas menos salidas no siempre coincide con el stock: también existen ajustes.
+Ejemplo: se compraron 15, pero se registraron 20 y no hubo despachos. Corregir el stock a 15 y elegir esa entrada deja **entrada 15, stock 15 y salida 0**. Si se anotaron 15 y realmente eran 20, la rectificación inversa deja entrada 20 y stock 20, sin aumentar salidas.
 
-No hay edición ni borrado individual de movimientos desde la interfaz; el ajuste corrige el saldo sin reescribir eventos anteriores. Si el motivo equivocado requiere aclaración sin cambiar cantidad, conservar una referencia externa para el encargado: no se permite crear ajustes de diferencia cero. La nota no identifica de forma segura al responsable ni sustituye una auditoría firmada.
+Con despachos posteriores hay que corregir el saldo actual: si se registró entrada 20 y se despacharon 5, hay stock 15. Si la entrada real era 15, el stock correcto es 10. Escribir 10 rectifica esa entrada a 15 y conserva la salida real de 5. La app no permite dejar una entrada o saldo negativos. Cantidad cero anula su aporte operativo, conservando el original y la constancia.
+
+**Fechas y precios:** la entrada rectificada mantiene su fecha y precio unitario histórico. Los totales y gráficos del período de recepción se recalculan con la cantidad vigente. La constancia figura con la fecha de corrección. Por ejemplo, rectificar hoy una recepción de octubre modifica los totales de octubre, sin crear una recepción o despacho de hoy. Un Excel ya guardado no se actualiza solo: exportar nuevamente para obtener la versión rectificada.
+
+**Ajuste de conteo:** elegirlo cuando hay una diferencia física que no corresponde a una entrada mal digitada. Cambia solo las existencias y su valor actual; conserva entradas/salidas. Requiere motivo y guarda saldos anterior/nuevo. No debe usarse para rectificar una recepción conocida.
+
+Sin diferencia de cantidad no se crea un evento. Si la entrada o el stock cambió mientras se editaba, volver a abrir la ficha y seleccionar la entrada actualizada. Todas las escrituras se confirman juntas. Los movimientos y ajustes ya existentes no se convierten automáticamente en rectificaciones ni se borran: investigar antes de decidir cómo tratarlos. La nota no identifica de forma segura al responsable ni sustituye una auditoría firmada.
 
 No usar **Eliminar producto** para corregir cantidades: elimina también su historial. **Vaciar toda la bodega** elimina todos los productos y movimientos del teléfono, después de confirmación. La app no tiene papelera ni restauración.
 
@@ -111,7 +116,7 @@ No usar **Eliminar producto** para corregir cantidades: elimina también su hist
 
 El libro tiene cinco hojas: Resumen, Inventario_actual, Por_producto, Por_dia_producto y Movimientos. Las operaciones se limitan al período compartido visible en Dashboard; el stock es siempre el actual. Se incluyen todas las operaciones del rango hasta 20.000. Si hay más, la app solicita acotar fechas, sin exportar un detalle incompleto. Las sumas de entradas y salidas representan actividad, no utilidad ni saldo neto; el saldo se consulta en inventario.
 
-En **Movimientos**, los ajustes figuran como AJUSTE con motivo, saldos anterior/nuevo y diferencia con signo. Su subtotal de flujo está vacío. Resumen cuenta ajustes y su diferencia neta; Por_producto y Por_dia_producto suman solo entradas/salidas, sin incorporar ajustes a esas cifras.
+En **Movimientos**, los ajustes figuran como AJUSTE con motivo, saldos anterior/nuevo y diferencia con signo. Su subtotal de flujo está vacío. Las rectificaciones incluyen ID de entrada, cantidades anterior/nueva y original. Resumen distingue rectificaciones de ajustes de conteo para no duplicar diferencias. Por_producto y Por_dia_producto usan entradas vigentes y salidas reales; la rectificación afecta el período original de recepción.
 
 El reporte no contiene una restauración de SQLite ni puede importarse para recuperar el teléfono. No incluye impuestos, facturas, costos históricos completos ni cálculo de utilidades. No presentarlo como sistema contable.
 

@@ -27,7 +27,7 @@ export function ResumenFlujos({ resumen, onCambiarFechas }: { resumen: ResumenEj
         <Text style={{ color: c.salida }}>{resumen.salidasUnidades.toLocaleString('es-CL')} unidades</Text>
       </View>
     </View>
-    <Text style={{ color: c.textoSecundario, fontSize: 12 }}>Totales de las fechas indicadas · ajustes excluidos</Text>
+    <Text style={{ color: c.textoSecundario, fontSize: 12 }}>Entradas con correcciones aplicadas · salidas registradas · conteos separados</Text>
     {onCambiarFechas ? <Pressable onPress={onCambiarFechas} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
       <Text style={{ color: c.acento, fontWeight: '700' }}>Cambiar período en Dashboard ›</Text>
     </Pressable> : null}

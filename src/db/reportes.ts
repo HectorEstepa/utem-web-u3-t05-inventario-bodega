@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import type { Periodo } from '../lib/periodo.ts';
-import { contarMovimientos, filtroMovimientos, listarMovimientosGlobales, listarProductos, obtenerResumenEjecutivo, type MovimientoDetallado, type Producto, type ResumenEjecutivo } from './inventario.ts';
+import { CANTIDAD_EFECTIVA, contarMovimientos, filtroMovimientos, listarMovimientosGlobales, listarProductos, obtenerResumenEjecutivo, type MovimientoDetallado, type Producto, type ResumenEjecutivo } from './inventario.ts';
 
 export interface FlujoProducto {
   codigo: string; nombre: string; entradas: number; salidas: number;
@@ -22,10 +22,10 @@ export async function cargarDatosReporte(db: SQLiteDatabase, periodo: Periodo): 
     if (n > MAX_MOVIMIENTOS_REPORTE) throw new Error(`Hay ${n.toLocaleString('es-CL')} movimientos en este período. Elige fechas más acotadas para exportar hasta 20.000 por reporte.`);
     const { where, params } = filtroMovimientos({ periodo });
     const columnas = `m.codigo, COALESCE(p.nombre, m.codigo) AS nombre,
-      SUM(CASE WHEN m.tipo = 'IN' THEN m.cantidad ELSE 0 END) AS entradas,
-      SUM(CASE WHEN m.tipo = 'OUT' THEN m.cantidad ELSE 0 END) AS salidas,
-      SUM(CASE WHEN m.tipo = 'IN' THEN m.cantidad * m.precio_unitario ELSE 0 END) AS montoEntradas,
-      SUM(CASE WHEN m.tipo = 'OUT' THEN m.cantidad * m.precio_unitario ELSE 0 END) AS montoSalidas,
+      SUM(CASE WHEN m.tipo = 'IN' THEN ${CANTIDAD_EFECTIVA} ELSE 0 END) AS entradas,
+      SUM(CASE WHEN m.tipo = 'OUT' THEN ${CANTIDAD_EFECTIVA} ELSE 0 END) AS salidas,
+      SUM(CASE WHEN m.tipo = 'IN' THEN ${CANTIDAD_EFECTIVA} * m.precio_unitario ELSE 0 END) AS montoEntradas,
+      SUM(CASE WHEN m.tipo = 'OUT' THEN ${CANTIDAD_EFECTIVA} * m.precio_unitario ELSE 0 END) AS montoSalidas,
       MIN(m.fecha) AS primeraFecha, MAX(m.fecha) AS ultimaFecha`;
     const base = `FROM movimientos m LEFT JOIN productos p ON p.codigo = m.codigo ${where}`;
     const resumen = await obtenerResumenEjecutivo(tx, periodo);

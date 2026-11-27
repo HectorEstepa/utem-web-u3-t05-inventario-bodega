@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { CANTIDAD_EFECTIVA } from './inventario.ts';
 import { validarPeriodo, type Periodo } from '../lib/periodo.ts';
 
 export interface PuntoEvolucion { desde: number; hasta: number; entradas: number; salidas: number }
@@ -19,9 +20,9 @@ export async function obtenerEvolucion(db: SQLiteDatabase, periodo: Periodo, aho
   const formato = agrupacion === 'día' ? '%Y-%m-%d' : agrupacion === 'mes' ? '%Y-%m' : '%Y';
   const filas = await db.getAllAsync<{ clave: string; entradas: number; salidas: number }>(
     `SELECT strftime('${formato}',fecha / 1000,'unixepoch','localtime') AS clave,
-      SUM(CASE WHEN tipo='IN' THEN cantidad ELSE 0 END) AS entradas,
-      SUM(CASE WHEN tipo='OUT' THEN cantidad ELSE 0 END) AS salidas
-     FROM movimientos WHERE fecha >= ? AND fecha < ? AND tipo IN ('IN','OUT') GROUP BY clave`, inicio.getTime(), fin
+      SUM(CASE WHEN tipo='IN' THEN ${CANTIDAD_EFECTIVA} ELSE 0 END) AS entradas,
+      SUM(CASE WHEN tipo='OUT' THEN ${CANTIDAD_EFECTIVA} ELSE 0 END) AS salidas
+     FROM movimientos m WHERE fecha >= ? AND fecha < ? AND tipo IN ('IN','OUT') GROUP BY clave`, inicio.getTime(), fin
   );
   const porClave = new Map(filas.map((f) => [f.clave, f]));
   const puntos: PuntoEvolucion[] = [];

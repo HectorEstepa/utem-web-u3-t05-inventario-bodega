@@ -85,3 +85,17 @@ Un fallo también es evidencia: registrar mensaje, pasos para reproducir, intent
 - Verificar la versión en Ajustes: 1.5.1; reiniciar Metro desde la carpeta actualizada.
 
 Estado: interacción física pendiente.
+
+## Rectificación de entradas v1.6.0 — pendiente en teléfono
+
+| Caso | Acción | Resultado esperado |
+| --- | --- | --- |
+| P28 | Alta 20 a $1.000; Editar stock 15 → Corregir entrada → elegir alta → motivo → guardar | Entrada vigente 15/$15.000; stock 15/$15.000; salidas 0. Original 20 conservado y constancia con ID/motivo |
+| P29 | Rectificar la misma entrada 15→20 y luego 20→0 | Totales, gráficos e inventario coinciden; ninguna salida añadida |
+| P30 | Entrada 20, despacho 5; rectificar stock de 15 a 10 | Entrada vigente 15; salida real 5; stock 10 |
+| P31 | Rectificar recepción de otro mes; exportar ambos períodos | Flujo corregido en fecha original; constancia en fecha de corrección; precio histórico conservado |
+| P32 | No elegir entrada, motivo vacío, selección obsoleta o corrección que excede la entrada | Rechazo sin cambios parciales ni evento duplicado |
+| P33 | Elegir Ajuste de conteo | Cambia solo stock; flujos sin cambio; Excel distingue conteo y rectificación |
+| P34 | Actualizar desde v3 con ajustes existentes y consultar entradas antiguas por páginas | No se pierden datos ni saldos; selección por ID/fecha funciona; no se reinterpretan salidas anteriores |
+
+Las comprobaciones automáticas usan SQLite real de Node; no sustituyen estas pruebas nativas.

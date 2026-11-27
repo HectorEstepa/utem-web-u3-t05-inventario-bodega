@@ -2,7 +2,7 @@
   "expo": {
     "name": "Inventario de bodega",
     "slug": "inventario-bodega",
-    "version": "1.5.1",
+    "version": "1.6.0",
     "platforms": ["android", "ios"],
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",

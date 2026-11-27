@@ -46,6 +46,90 @@ function adaptar(sql: DatabaseSync) {
 
 const ficha = { codigo: '4006381333931', nombre: 'Producto de prueba', stockInicial: 10, minimo: 5, precio: 1290 };
 
+test('rectifica entrada 20→15→20→0 sin despacho y conserva original, precio, fecha y constancias', async () => {
+  const sql = new DatabaseSync(':memory:'); const db = adaptar(sql);
+  try {
+    await migrar(db); await crearProducto(db, { ...ficha, stockInicial: 20, precio: 1000 });
+    const entrada = (await historial(db, ficha.codigo))[0]!;
+    const fecha = new Date(2026, 10, 1, 12).getTime();
+    sql.prepare('UPDATE movimientos SET fecha=? WHERE id=?').run(fecha, entrada.id);
+    const periodo = resolverPeriodo({ modo: 'rango', desde: '2026-11-01', hasta: '2026-11-01' });
+    for (const [anterior, nueva] of [[20, 15], [15, 20], [20, 0]]) {
+      await actualizarProducto(db, { ...ficha, precio: 2000, stock: nueva, stockAnterior: anterior,
+        motivo: 'Cantidad de recepción mal digitada', correccionEntrada: { id: entrada.id, cantidadAnterior: anterior! } });
+      const r = await obtenerResumenEjecutivo(db, periodo);
+      assert.equal(r.unidadesTotales, nueva); assert.equal(r.valorInventarioCLP, nueva! * 2000);
+      assert.equal(r.entradasUnidades, nueva); assert.equal(r.entradasMontoCLP, nueva! * 1000);
+      assert.equal(r.salidasUnidades, 0); assert.equal(r.salidasMontoCLP, 0);
+      const e = (await historial(db, ficha.codigo)).find((m) => m.id === entrada.id)!;
+      assert.equal(e.cantidad, nueva); assert.equal(e.cantidad_original, 20); assert.equal(e.fecha, fecha);
+      const serie = await obtenerEvolucion(db, periodo);
+      assert.equal(serie.puntos[0]?.entradas, nueva); assert.equal(serie.puntos[0]?.salidas, 0);
+      const reporte = await cargarDatosReporte(db, periodo);
+      assert.equal(reporte.porProducto[0]?.entradas, nueva); assert.equal(reporte.porDia[0]?.montoEntradas, nueva! * 1000);
+      const ws = crearLibroReporte(reporte).Sheets.Movimientos!;
+      assert.equal(ws.G7.v, nueva); assert.equal(ws.O7.v, 20); assert.equal(ws.I7.v, nueva! * 1000);
+    }
+    const constancias = (await historial(db, ficha.codigo)).filter((m) => m.entrada_corregida_id === entrada.id);
+    assert.equal(constancias.length, 3);
+    assert.equal(constancias[0]?.entrada_cantidad_antes, 20); assert.equal(constancias[0]?.entrada_cantidad_despues, 0);
+    assert.equal(constancias[0]?.tipo, 'ADJ');
+    assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM movimientos WHERE tipo='OUT'").get()?.n, 0);
+    const completo = await cargarDatosReporte(db, TODO_EL_HISTORIAL);
+    const ws = crearLibroReporte(completo).Sheets.Movimientos!;
+    assert.equal(ws.D7.v, 'RECTIFICACIÓN ENTRADA'); assert.equal(ws.P7.v, entrada.id);
+    assert.equal(ws.Q7.v, 20); assert.equal(ws.R7.v, 0);
+  } finally { sql.close(); }
+});
+
+test('corregir recepción con despachos previos conserva salidas y revierte todo ante fallo o selección inválida', async () => {
+  const sql = new DatabaseSync(':memory:'); const db = adaptar(sql);
+  try {
+    await migrar(db); await crearProducto(db, { ...ficha, stockInicial: 20 });
+    const entrada = (await historial(db, ficha.codigo))[0]!;
+    await registrarMovimiento(db, ficha.codigo, 'OUT', 5);
+    const salida = (await historial(db, ficha.codigo))[0]!;
+    const datos = { ...ficha, stockAnterior: 15, stock: 10, precio: 1290, motivo: 'Debieron entrar 15', correccionEntrada: { id: entrada.id, cantidadAnterior: 20 } };
+    await assert.rejects(actualizarProducto(db, { ...datos, correccionEntrada: { id: salida.id, cantidadAnterior: 5 } }), /entrada/);
+    await assert.rejects(actualizarProducto(db, { ...datos, correccionEntrada: { id: entrada.id, cantidadAnterior: 19 } }), /entrada/);
+    sql.exec("CREATE TRIGGER fallo_rectificacion BEFORE INSERT ON movimientos WHEN NEW.entrada_corregida_id IS NOT NULL BEGIN SELECT RAISE(ABORT,'fallo rectificacion'); END;");
+    await assert.rejects(actualizarProducto(db, datos), /fallo rectificacion/);
+    assert.equal((await buscarPorCodigo(db, ficha.codigo))?.stock, 15);
+    assert.equal((await historial(db, ficha.codigo)).find((m) => m.id === entrada.id)?.cantidad, 20);
+    sql.exec('DROP TRIGGER fallo_rectificacion');
+    await actualizarProducto(db, datos);
+    const r = await obtenerResumenEjecutivo(db);
+    assert.equal(r.entradasUnidades, 15); assert.equal(r.salidasUnidades, 5); assert.equal(r.salidasMontoCLP, 5 * ficha.precio);
+    assert.equal(r.unidadesTotales, 10);
+    // Otra recepción aporta saldo, pero no permite rectificar esta entrada por debajo de cero.
+    await registrarMovimiento(db, ficha.codigo, 'IN', 100);
+    await assert.rejects(actualizarProducto(db, { ...datos, stockAnterior: 110, stock: 0, correccionEntrada: { id: entrada.id, cantidadAnterior: 15 } }), /negativa/);
+    assert.equal((await buscarPorCodigo(db, ficha.codigo))?.stock, 110);
+  } finally { sql.close(); }
+});
+
+test('migra v3 con ajustes existentes sin perder saldos y revierte columnas si falla v4', async () => {
+  const sql = new DatabaseSync(':memory:'); const db = adaptar(sql);
+  try {
+    sql.exec(`CREATE TABLE productos(codigo TEXT PRIMARY KEY,nombre TEXT,stock INTEGER,minimo INTEGER,precio INTEGER,creado_en INTEGER);
+      CREATE TABLE movimientos(id INTEGER PRIMARY KEY AUTOINCREMENT,codigo TEXT REFERENCES productos(codigo) ON DELETE CASCADE,tipo TEXT,cantidad INTEGER,precio_unitario INTEGER,nota TEXT,fecha INTEGER,stock_antes INTEGER,stock_despues INTEGER);
+      INSERT INTO productos VALUES('4006381333931','Producto',15,5,1290,1);
+      INSERT INTO movimientos VALUES(1,'4006381333931','IN',20,1290,'Alta',1,NULL,NULL);
+      INSERT INTO movimientos VALUES(2,'4006381333931','ADJ',5,1290,'Conteo anterior',2,20,15);
+      PRAGMA user_version=3;`);
+    const original = db.execAsync.bind(db);
+    db.execAsync = async (q: string) => { await original(q); if (q.includes('ADD COLUMN entrada_cantidad_despues')) throw new Error('fallo migración'); };
+    await assert.rejects(migrar(db), /fallo migración/);
+    assert.equal(sql.prepare('PRAGMA user_version').get()?.user_version, 3);
+    assert.equal(sql.prepare('PRAGMA table_info(movimientos)').all().some((c) => c.name === 'cantidad_corregida'), false);
+    db.execAsync = original; await migrar(db); await migrar(db);
+    const filas = await historial(db, ficha.codigo);
+    assert.equal(filas[0]?.stock_antes, 20); assert.equal(filas[0]?.stock_despues, 15);
+    assert.equal(filas[0]?.nota, 'Conteo anterior'); assert.equal(filas.length, 2);
+    assert.equal(sql.prepare('PRAGMA user_version').get()?.user_version, 4);
+  } finally { sql.close(); }
+});
+
 test('corregir cantidad conserva flujos y exporta saldos y motivo; valida y evita edición obsoleta', async () => {
   const sql = new DatabaseSync(':memory:'); const db = adaptar(sql);
   try {
@@ -101,7 +185,7 @@ test('evolución completa días sin actividad, suma flujos y excluye ajustes y l
   } finally { sql.close(); }
 });
 
-test('migra v2 a v3 conservando IDs, secuencia incluso eliminados y cascada', async () => {
+test('migra v2 a v4 conservando IDs, secuencia incluso eliminados y cascada', async () => {
   const sql = new DatabaseSync(':memory:'); const db = adaptar(sql);
   try {
     sql.exec(`CREATE TABLE productos(codigo TEXT PRIMARY KEY,nombre TEXT,stock INTEGER,minimo INTEGER,precio INTEGER,creado_en INTEGER);

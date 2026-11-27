@@ -38,8 +38,9 @@ export function crearLibroReporte(d: DatosReporte): XLSX.WorkBook {
       [celda('Entradas', estilo('DCFCE7', '166534', true)), r.entradasUnidades, dinero(r.entradasMontoCLP), 'Período seleccionado'],
       [celda('Salidas', estilo('EDE9FE', '6D28D9', true)), r.salidasUnidades, dinero(r.salidasMontoCLP), 'Período seleccionado'],
       ['Variación de unidades', r.entradasUnidades - r.salidasUnidades, '', 'Entradas menos salidas; no es el stock final'],
-      ['Ajustes de cantidad', d.movimientos.filter((m) => m.tipo === 'ADJ').length, '', 'Correcciones; excluidas de entradas y salidas'],
-      ['Diferencia por ajustes u.', d.movimientos.reduce((n, m) => n + (m.tipo === 'ADJ' ? (m.stock_despues ?? 0) - (m.stock_antes ?? 0) : 0), 0), '', 'Detalle y motivos en Movimientos'],
+      ['Ajustes de conteo', d.movimientos.filter((m) => m.tipo === 'ADJ' && !m.entrada_corregida_id).length, '', 'Solo diferencias físicas, sin rectificar entradas'],
+      ['Diferencia por conteos u.', d.movimientos.reduce((n, m) => n + (m.tipo === 'ADJ' && !m.entrada_corregida_id ? (m.stock_despues ?? 0) - (m.stock_antes ?? 0) : 0), 0), '', 'Excluye rectificaciones ya aplicadas a entradas'],
+      ['Rectificaciones de entrada', d.movimientos.filter((m) => !!m.entrada_corregida_id).length, '', 'Constancias hechas en este período; entrada efectiva en su fecha original'],
       ['Movimientos incluidos', r.totalMovimientos, '', 'Todas las filas del período, sin truncamiento'],
       ['Primera operación incluida', r.primeraFecha === null ? 'Sin movimientos' : fechaHora(r.primeraFecha), '', 'Fecha local'],
       ['Última operación incluida', r.ultimaFecha === null ? 'Sin movimientos' : fechaHora(r.ultimaFecha), '', 'Fecha local'],
@@ -62,9 +63,9 @@ export function crearLibroReporte(d: DatosReporte): XLSX.WorkBook {
     d.porDia.map((p) => [p.dia, celda(p.codigo), p.nombre, p.entradas, p.salidas, p.entradas - p.salidas, dinero(p.montoEntradas), dinero(p.montoSalidas)]), [26, 18, 36, 17, 17, 18, 22, 22]);
 
   const movs: unknown[][] = d.movimientos.map((m, i) => [m.id, fechaLocal(new Date(m.fecha)), new Date(m.fecha).toLocaleTimeString('es-CL'),
-    celda(m.tipo === 'ADJ' ? 'AJUSTE' : m.tipo === 'IN' ? 'ENTRADA' : 'SALIDA', m.tipo === 'ADJ' ? estilo('E0F2FE', '075985', true) : m.tipo === 'IN' ? estilo('DCFCE7', '166534', true) : estilo('EDE9FE', '6D28D9', true)),
-    celda(m.codigo), m.nombre_producto, m.cantidad, dinero(m.precio_unitario), m.tipo === 'ADJ' ? '' : formula(`G${i + 7}*H${i + 7}`, m.cantidad * m.precio_unitario, CLP), m.nota, new Date(m.fecha).toISOString(), m.stock_antes ?? '', m.stock_despues ?? '', m.tipo === 'ADJ' ? (m.stock_despues ?? 0) - (m.stock_antes ?? 0) : '']);
-  hoja('Movimientos', 'DETALLE DE MOVIMIENTOS', `${d.movimientos.length} operaciones del período. Fechas locales y marca UTC incluidas. Los ajustes muestran saldos anterior/nuevo y motivo; no suman entradas, salidas ni montos de flujo. Las salidas son despachos valorizados.`,
-    ['ID', 'Fecha local AAAA-MM-DD', 'Hora local', 'Tipo', 'GTIN', 'Producto', 'Cantidad u.', 'Precio histórico CLP', 'Subtotal CLP', 'Nota / motivo', 'Fecha UTC ISO 8601', 'Saldo antes ajuste', 'Saldo después ajuste', 'Diferencia ajuste u.'], movs, [10, 26, 16, 15, 18, 36, 18, 25, 22, 38, 30]);
+    celda(m.entrada_corregida_id ? 'RECTIFICACIÓN ENTRADA' : m.tipo === 'ADJ' ? 'AJUSTE' : m.tipo === 'IN' ? 'ENTRADA' : 'SALIDA', m.tipo === 'ADJ' ? estilo('E0F2FE', '075985', true) : m.tipo === 'IN' ? estilo('DCFCE7', '166534', true) : estilo('EDE9FE', '6D28D9', true)),
+    celda(m.codigo), m.nombre_producto, m.cantidad, dinero(m.precio_unitario), m.tipo === 'ADJ' ? '' : formula(`G${i + 7}*H${i + 7}`, m.cantidad * m.precio_unitario, CLP), m.nota, new Date(m.fecha).toISOString(), m.stock_antes ?? '', m.stock_despues ?? '', m.tipo === 'ADJ' ? (m.stock_despues ?? 0) - (m.stock_antes ?? 0) : '', m.cantidad_original ?? m.cantidad, m.entrada_corregida_id ?? '', m.entrada_cantidad_antes ?? '', m.entrada_cantidad_despues ?? '']);
+  hoja('Movimientos', 'DETALLE DE MOVIMIENTOS', `${d.movimientos.length} operaciones del período. Entradas con cantidad vigente y precio/fecha originales; rectificaciones con vínculo y valores anteriores/nuevos en su fecha de corrección. Las constancias no son despachos ni se suman otra vez al flujo.`,
+    ['ID', 'Fecha local AAAA-MM-DD', 'Hora local', 'Tipo', 'GTIN', 'Producto', 'Cantidad vigente u.', 'Precio histórico CLP', 'Subtotal CLP', 'Nota / motivo', 'Fecha UTC ISO 8601', 'Saldo antes ajuste', 'Saldo después ajuste', 'Diferencia ajuste u.', 'Cantidad originalmente registrada', 'ID entrada rectificada', 'Entrada antes corrección u.', 'Entrada después corrección u.'], movs, [10, 26, 16, 15, 18, 36, 18, 25, 22, 38, 30]);
   return libro;
 }
