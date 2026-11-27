@@ -3,12 +3,15 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Boton } from '../components/Boton';
 import { Cargando, ErrorEstado, Vacio } from '../components/Estados';
+import { GraficoTrading } from '../components/GraficoTrading';
 import { SelectorSegmentado } from '../components/SelectorSegmentado';
 import {
   listarMovimientosGlobales,
   obtenerResumenEjecutivo,
+  obtenerSerieFinanciera,
   sembrarCatalogoDemo,
   type MovimientoDetallado,
+  type PuntoFinanciero,
   type ResumenEjecutivo,
 } from '../db/inventario';
 import { exportarReporteExcel } from '../lib/exportarExcel';
@@ -22,7 +25,8 @@ type FiltroMov = 'TODOS' | 'OUT' | 'IN';
  * - Valorización del capital actual en bodega ($ CLP), ingresos acumulados
  *   (recepción) y salidas acumuladas (despachos / ventas).
  * - Distribución visual de salud del stock (Óptimo / Stock bajo / Agotado).
- * - Top 5 productos por capital inmovilizado con barras proporcionales.
+ * - Gráfico financiero interactivo tipo bolsa/trading con evolución de capital
+ *   CLP y unidades físicas, barras de volumen y cursor táctil.
  * - Bitácora global filtrable de entradas y salidas.
  * - Exportación directa de libro Excel (.xlsx de 3 hojas) mediante menú nativo.
  */
@@ -36,6 +40,7 @@ export function PantallaDashboard({
   const db = useSQLiteContext();
   const { paleta } = useTema();
   const [resumen, setResumen] = useState<ResumenEjecutivo | null>(null);
+  const [serieFinanciera, setSerieFinanciera] = useState<PuntoFinanciero[]>([]);
   const [movimientos, setMovimientos] = useState<MovimientoDetallado[]>([]);
   const [filtroMov, setFiltroMov] = useState<FiltroMov>('TODOS');
   const [cargando, setCargando] = useState(true);
@@ -46,11 +51,13 @@ export function PantallaDashboard({
   const cargar = useCallback(async () => {
     try {
       setError(null);
-      const [res, movs] = await Promise.all([
+      const [res, serie, movs] = await Promise.all([
         obtenerResumenEjecutivo(db),
+        obtenerSerieFinanciera(db, 60),
         listarMovimientosGlobales(db, { tipo: filtroMov, limite: 40 }),
       ]);
       setResumen(res);
+      setSerieFinanciera(serie);
       setMovimientos(movs);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al cargar las métricas ejecutivas.');
@@ -92,7 +99,6 @@ export function PantallaDashboard({
   const pctOptimo = (resumen.skusOptimos / totalSkus) * 100;
   const pctBajo = (resumen.skusBajoMinimo / totalSkus) * 100;
   const pctAgotado = (resumen.skusAgotados / totalSkus) * 100;
-  const maxTop = Math.max(1, ...(resumen.topValorizados.map((t) => t.valorTotal) || [1]));
 
   return (
     <ScrollView
@@ -249,47 +255,8 @@ export function PantallaDashboard({
             </View>
           </View>
 
-          {/* Top 5 SKUs por Valorización */}
-          <View
-            style={[
-              s.tarjeta,
-              { backgroundColor: paleta.superficie, borderColor: paleta.borde },
-            ]}
-          >
-            <Text style={[s.kicker, { color: paleta.textoSecundario }]}>
-              TOP PRODUCTOS POR CAPITAL EN BODEGA
-            </Text>
-            {resumen.topValorizados.map((item) => {
-              const anchoPct = Math.max(6, Math.round((item.valorTotal / maxTop) * 100));
-              return (
-                <Pressable
-                  key={item.codigo}
-                  onPress={() => onAbrirCodigo(item.codigo)}
-                  style={s.topFila}
-                >
-                  <View style={s.topCabecera}>
-                    <Text style={[s.topNombre, { color: paleta.texto }]} numberOfLines={1}>
-                      {item.nombre}
-                    </Text>
-                    <Text style={[s.topMonto, { color: paleta.texto }]}>
-                      {formatearCLP(item.valorTotal)}
-                    </Text>
-                  </View>
-                  <View style={[s.pistaBarra, { backgroundColor: paleta.inputFondo }]}>
-                    <View
-                      style={[
-                        s.rellenoBarra,
-                        { width: `${anchoPct}%`, backgroundColor: paleta.acento },
-                      ]}
-                    />
-                  </View>
-                  <Text style={[s.topMeta, { color: paleta.textoTerciario }]}>
-                    {item.stock} u. × {formatearCLP(item.precio)} · GTIN {item.codigo}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          {/* Gráfico financiero interactivo tipo bolsa / trading */}
+          <GraficoTrading serie={serieFinanciera} />
 
           {/* Bitácora global de entradas y salidas */}
           <View

@@ -46,6 +46,18 @@ export interface ResumenEjecutivo {
   }>;
 }
 
+export interface PuntoFinanciero {
+  id: number;
+  fecha: number;
+  capitalCLP: number;
+  unidades: number;
+  deltaCLP: number;
+  deltaUnidades: number;
+  tipo: 'IN' | 'OUT';
+  producto: string;
+  nota: string;
+}
+
 export type FiltroEstadoLista = 'todos' | 'bajo' | 'agotado';
 
 /**
@@ -143,23 +155,51 @@ export async function crearProducto(
 
 export async function actualizarProducto(
   db: SQLiteDatabase,
-  datos: { codigo: string; nombre: string; minimo: number; precio: number }
+  datos: { codigo: string; nombre: string; minimo: number; precio: number; stock?: number }
 ): Promise<void> {
-  const { codigo, nombre, minimo, precio } = datos;
+  const { codigo, nombre, minimo, precio, stock } = datos;
   if (!nombre.trim()) throw new Error('El nombre no puede quedar vacío.');
   if (!Number.isInteger(minimo) || minimo < 1 || minimo > 99999) {
     throw new Error('El stock mínimo debe ser un entero entre 1 y 99.999.');
   }
   const errPrecio = validarPrecio(precio);
   if (errPrecio) throw new Error(errPrecio);
+  if (stock !== undefined && (!Number.isInteger(stock) || stock < 0 || stock > 999999)) {
+    throw new Error('El stock actual debe ser un entero entre 0 y 999.999.');
+  }
 
-  await db.runAsync(
-    'UPDATE productos SET nombre = ?, minimo = ?, precio = ? WHERE codigo = ?',
-    nombre.trim(),
-    minimo,
-    precio,
-    codigo
-  );
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    const actual = await tx.getFirstAsync<{ stock: number }>(
+      'SELECT stock FROM productos WHERE codigo = ?',
+      codigo
+    );
+    if (!actual) throw new Error(`El producto ${codigo} ya no existe en la base.`);
+
+    const stockFinal = stock !== undefined ? stock : actual.stock;
+
+    await tx.runAsync(
+      'UPDATE productos SET nombre = ?, minimo = ?, precio = ?, stock = ? WHERE codigo = ?',
+      nombre.trim(),
+      minimo,
+      precio,
+      stockFinal,
+      codigo
+    );
+
+    const diferencia = stockFinal - actual.stock;
+    if (diferencia !== 0) {
+      await tx.runAsync(
+        `INSERT INTO movimientos (codigo, tipo, cantidad, precio_unitario, nota, fecha)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        codigo,
+        diferencia > 0 ? 'IN' : 'OUT',
+        Math.abs(diferencia),
+        precio,
+        'Ajuste directo de stock',
+        Date.now()
+      );
+    }
+  });
 }
 
 export async function eliminarProducto(db: SQLiteDatabase, codigo: string): Promise<void> {
@@ -340,6 +380,64 @@ export async function obtenerResumenEjecutivo(db: SQLiteDatabase): Promise<Resum
     totalMovimientos: aggMov?.totalMovimientos ?? 0,
     topValorizados: top,
   };
+}
+
+/**
+ * Construye la serie cronológica acumulada de capital ($ CLP) y unidades
+ * físicas en bodega a partir del libro de movimientos para el gráfico
+ * financiero interactivo del Dashboard.
+ */
+export async function obtenerSerieFinanciera(
+  db: SQLiteDatabase,
+  limite = 60
+): Promise<PuntoFinanciero[]> {
+  const filas = await db.getAllAsync<{
+    id: number;
+    fecha: number;
+    tipo: 'IN' | 'OUT';
+    cantidad: number;
+    precio_unitario: number;
+    nota: string;
+    producto: string;
+  }>(`
+    SELECT
+      m.id,
+      m.fecha,
+      m.tipo,
+      m.cantidad,
+      m.precio_unitario,
+      m.nota,
+      COALESCE(p.nombre, m.codigo) AS producto
+    FROM movimientos m
+    LEFT JOIN productos p ON p.codigo = m.codigo
+    ORDER BY m.fecha ASC, m.id ASC
+  `);
+
+  let capitalAcum = 0;
+  let unidadesAcum = 0;
+  const serie: PuntoFinanciero[] = [];
+
+  for (const f of filas) {
+    const monto = f.cantidad * (f.precio_unitario ?? 0);
+    const deltaCLP = f.tipo === 'IN' ? monto : -monto;
+    const deltaUnidades = f.tipo === 'IN' ? f.cantidad : -f.cantidad;
+    capitalAcum = Math.max(0, capitalAcum + deltaCLP);
+    unidadesAcum = Math.max(0, unidadesAcum + deltaUnidades);
+
+    serie.push({
+      id: f.id,
+      fecha: f.fecha,
+      capitalCLP: capitalAcum,
+      unidades: unidadesAcum,
+      deltaCLP,
+      deltaUnidades,
+      tipo: f.tipo,
+      producto: f.producto,
+      nota: f.nota || (f.tipo === 'IN' ? 'Entrada de stock' : 'Salida / despacho'),
+    });
+  }
+
+  return serie.length > limite ? serie.slice(serie.length - limite) : serie;
 }
 
 /**

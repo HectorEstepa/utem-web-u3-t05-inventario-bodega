@@ -52,6 +52,7 @@ export function PantallaProducto({
   const [nota, setNota] = useState('');
   const [editandoFicha, setEditandoFicha] = useState(false);
   const [editNombre, setEditNombre] = useState('');
+  const [editStock, setEditStock] = useState('0');
   const [editPrecio, setEditPrecio] = useState('0');
   const [editMinimo, setEditMinimo] = useState('5');
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +68,7 @@ export function PantallaProducto({
       setProducto(p);
       if (p) {
         setEditNombre(p.nombre);
+        setEditStock(String(p.stock));
         setEditPrecio(String(p.precio ?? 0));
         setEditMinimo(String(p.minimo));
         setMovs(await historial(db, codigo, 15));
@@ -149,6 +151,7 @@ export function PantallaProducto({
   const guardarEdicion = async () => {
     if (!producto || ocupado) return;
     Keyboard.dismiss();
+    const nuevoStock = editStock.trim() === '' ? NaN : Number(editStock);
     setOcupado(true);
     setError(null);
     try {
@@ -157,9 +160,17 @@ export function PantallaProducto({
         nombre: editNombre,
         minimo: Number(editMinimo),
         precio: Number(editPrecio || '0'),
+        stock: nuevoStock,
       });
       setEditandoFicha(false);
-      setAviso('Ficha del producto actualizada.');
+      if (nuevoStock !== producto.stock) {
+        Vibration.vibrate(25);
+        setAviso(
+          `Ficha actualizada · Stock corregido de ${producto.stock} a ${nuevoStock} u. (ajuste registrado).`
+        );
+      } else {
+        setAviso('Ficha del producto actualizada.');
+      }
       await refrescar();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al actualizar el producto.');
@@ -281,7 +292,7 @@ export function PantallaProducto({
               {editandoFicha ? (
                 <View style={[s.panelEdicion, { borderTopColor: paleta.separador }]}>
                   <Text style={[s.rotulo, { color: paleta.textoSecundario }]}>
-                    EDITAR NOMBRE, PRECIO CLP Y MÍNIMO
+                    EDITAR FICHA Y STOCK DIRECTO
                   </Text>
                   <TextInput
                     value={editNombre}
@@ -295,15 +306,23 @@ export function PantallaProducto({
                   />
                   <View style={s.filaDos}>
                     <View style={{ flex: 1 }}>
-                      <Text style={[s.miniLbl, { color: paleta.textoTerciario }]}>Precio CLP</Text>
+                      <Text style={[s.miniLbl, { color: paleta.acento }]}>Stock actual</Text>
                       <TextInput
-                        value={editPrecio}
-                        onChangeText={(t) => setEditPrecio(t.replace(/[^0-9]/g, ''))}
+                        value={editStock}
+                        onChangeText={(t) => setEditStock(t.replace(/[^0-9]/g, ''))}
                         keyboardType="number-pad"
-                        maxLength={8}
+                        maxLength={6}
+                        placeholder="0"
+                        placeholderTextColor={paleta.textoTerciario}
                         style={[
                           s.input,
-                          { backgroundColor: paleta.inputFondo, color: paleta.texto },
+                          {
+                            backgroundColor: paleta.inputFondo,
+                            color: paleta.texto,
+                            borderWidth: 1.5,
+                            borderColor: paleta.acento,
+                            fontWeight: '700',
+                          },
                         ]}
                       />
                     </View>
@@ -321,6 +340,25 @@ export function PantallaProducto({
                       />
                     </View>
                   </View>
+                  <View>
+                    <Text style={[s.miniLbl, { color: paleta.textoTerciario }]}>
+                      Precio unitario (CLP)
+                    </Text>
+                    <TextInput
+                      value={editPrecio}
+                      onChangeText={(t) => setEditPrecio(t.replace(/[^0-9]/g, ''))}
+                      keyboardType="number-pad"
+                      maxLength={8}
+                      style={[
+                        s.input,
+                        { backgroundColor: paleta.inputFondo, color: paleta.texto },
+                      ]}
+                    />
+                  </View>
+                  <Text style={[s.miniLbl, { color: paleta.textoTerciario }]}>
+                    Si modificas el stock aquí, se registra automáticamente un ajuste auditable en el
+                    historial sin necesidad de marcar Entrada o Salida.
+                  </Text>
                   <Boton
                     titulo="Guardar cambios"
                     onPress={guardarEdicion}
