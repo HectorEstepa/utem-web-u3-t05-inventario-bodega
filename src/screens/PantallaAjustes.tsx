@@ -60,7 +60,7 @@ export function PantallaAjustes({
     setOcupado(true);
     try {
       await sembrarCatalogoDemo(db);
-      setMensaje('Catálogo demostrativo cargado (5 SKUs reales con precios CLP y movimientos).');
+      setMensaje('Catálogo demostrativo cargado (5 artículos ficticios con precios CLP y movimientos).');
     } catch (e) {
       setMensaje(e instanceof Error ? e.message : 'No se pudo cargar el lote de prueba.');
     } finally {
@@ -255,7 +255,7 @@ export function PantallaAjustes({
               Cargar catálogo demostrativo
             </Text>
             <Text style={[s.filaSub, { color: paleta.textoSecundario }]}>
-              Agrega 5 artículos reales GS1 con precios CLP y movimientos de prueba
+              Agrega 5 artículos ficticios con códigos válidos y movimientos de prueba
             </Text>
           </View>
           <Text style={[s.chevron, { color: paleta.textoTerciario }]}>›</Text>
@@ -274,7 +274,7 @@ export function PantallaAjustes({
               Diagnóstico y benchmark (M1 · M2 · M3)
             </Text>
             <Text style={[s.filaSub, { color: paleta.textoSecundario }]}>
-              SQLite vs AsyncStorage (5.000 SKUs) · Arranque actual:{' '}
+              SQLite vs AsyncStorage (5.000 SKUs) · Inicio JS actual:{' '}
               {arranqueMs !== null ? `${arranqueMs.toFixed(0)} ms` : '—'}
             </Text>
           </View>
@@ -344,9 +344,9 @@ export function PantallaAjustes({
             { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: paleta.separador },
           ]}
         >
-          <Text style={[s.filaTitulo, { color: paleta.texto }]}>Privacidad (Ley 21.719)</Text>
+          <Text style={[s.filaTitulo, { color: paleta.texto }]}>Datos del inventario</Text>
           <Text style={[s.valorDerecha, { color: paleta.textoSecundario }]}>
-            0 datos personales
+            Sin cuentas ni identificación de personas
           </Text>
         </View>
         <View

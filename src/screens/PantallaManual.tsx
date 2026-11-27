@@ -16,7 +16,7 @@ import { procesarLectura } from '../lib/gtin';
 import { useTema } from '../theme';
 
 const CODIGOS_EJEMPLO = [
-  { etiqueta: 'EAN-13 GS1', codigo: '4006381333931' },
+  { etiqueta: 'EAN-13 de prueba', codigo: '4006381333931' },
   { etiqueta: 'Café 250g', codigo: '5012345670003' },
   { etiqueta: 'EAN-8', codigo: '96385074' },
 ] as const;
@@ -104,7 +104,7 @@ export function PantallaManual({
                   returnKeyType="done"
                   onSubmitEditing={confirmar}
                   maxLength={13}
-                  placeholder="7801610001625"
+                  placeholder="7801610001622"
                   placeholderTextColor={paleta.textoTerciario}
                   style={[s.input, { color: paleta.texto }]}
                   accessibilityLabel="Código de barras numérico"

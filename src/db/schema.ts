@@ -4,7 +4,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
  * Esquema y migraciones incrementales de la base local SQLite.
  *
  * Decisiones de rendimiento y consistencia:
- * 1. El stock se guarda como columna en `productos` (lectura O(1)) y además
+ * 1. El stock se guarda como columna en `productos` (lectura directa del saldo) y además
  *    queda la bitácora completa en `movimientos` sincronizada en transacción
  *    exclusiva, evitando `SUM()` lineal sobre miles de eventos históricos.
  * 2. Los precios en pesos chilenos (`precio` y `precio_unitario`) se guardan
@@ -23,42 +23,48 @@ export async function migrar(db: SQLiteDatabase): Promise<void> {
 
   const fila = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const actual = fila?.user_version ?? 0;
-  if (actual >= VERSION_ESQUEMA) return;
-
-  if (actual < 1) {
-    await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS productos (
-        codigo      TEXT    PRIMARY KEY,
-        nombre      TEXT    NOT NULL,
-        stock       INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
-        minimo      INTEGER NOT NULL DEFAULT 5 CHECK (minimo >= 0),
-        precio      INTEGER NOT NULL DEFAULT 0 CHECK (precio >= 0),
-        creado_en   INTEGER NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS movimientos (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
-        codigo          TEXT    NOT NULL REFERENCES productos(codigo) ON DELETE CASCADE,
-        tipo            TEXT    NOT NULL CHECK (tipo IN ('IN','OUT')),
-        cantidad        INTEGER NOT NULL CHECK (cantidad > 0),
-        precio_unitario INTEGER NOT NULL DEFAULT 0 CHECK (precio_unitario >= 0),
-        nota            TEXT    NOT NULL DEFAULT '',
-        fecha           INTEGER NOT NULL
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_mov_codigo ON movimientos(codigo, fecha DESC);
-      CREATE INDEX IF NOT EXISTS idx_mov_fecha ON movimientos(fecha DESC);
-      CREATE INDEX IF NOT EXISTS idx_prod_stock ON productos(stock);
-    `);
-  } else if (actual === 1) {
-    // Migración no destructiva desde v1: conserva todo el inventario previo.
-    await db.execAsync(`
-      ALTER TABLE productos ADD COLUMN precio INTEGER NOT NULL DEFAULT 0 CHECK (precio >= 0);
-      ALTER TABLE movimientos ADD COLUMN precio_unitario INTEGER NOT NULL DEFAULT 0 CHECK (precio_unitario >= 0);
-      ALTER TABLE movimientos ADD COLUMN nota TEXT NOT NULL DEFAULT '';
-      CREATE INDEX IF NOT EXISTS idx_mov_fecha ON movimientos(fecha DESC);
-    `);
+  if (actual > VERSION_ESQUEMA) {
+    throw new Error('La bodega pertenece a una versión más reciente. Actualiza la app para abrirla.');
   }
+  if (actual === VERSION_ESQUEMA) return;
 
-  await db.execAsync(`PRAGMA user_version = ${VERSION_ESQUEMA}`);
+  // El esquema y su versión se confirman juntos; un fallo permite reintentar.
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    if (actual < 1) {
+      await tx.execAsync(`
+        CREATE TABLE IF NOT EXISTS productos (
+          codigo      TEXT    PRIMARY KEY,
+          nombre      TEXT    NOT NULL,
+          stock       INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+          minimo      INTEGER NOT NULL DEFAULT 5 CHECK (minimo >= 0),
+          precio      INTEGER NOT NULL DEFAULT 0 CHECK (precio >= 0),
+          creado_en   INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS movimientos (
+          id              INTEGER PRIMARY KEY AUTOINCREMENT,
+          codigo          TEXT    NOT NULL REFERENCES productos(codigo) ON DELETE CASCADE,
+          tipo            TEXT    NOT NULL CHECK (tipo IN ('IN','OUT')),
+          cantidad        INTEGER NOT NULL CHECK (cantidad > 0),
+          precio_unitario INTEGER NOT NULL DEFAULT 0 CHECK (precio_unitario >= 0),
+          nota            TEXT    NOT NULL DEFAULT '',
+          fecha           INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_mov_codigo ON movimientos(codigo, fecha DESC);
+        CREATE INDEX IF NOT EXISTS idx_mov_fecha ON movimientos(fecha DESC);
+        CREATE INDEX IF NOT EXISTS idx_prod_stock ON productos(stock);
+      `);
+    } else if (actual === 1) {
+      // Migración no destructiva desde v1: conserva todo el inventario previo.
+      await tx.execAsync(`
+        ALTER TABLE productos ADD COLUMN precio INTEGER NOT NULL DEFAULT 0 CHECK (precio >= 0);
+        ALTER TABLE movimientos ADD COLUMN precio_unitario INTEGER NOT NULL DEFAULT 0 CHECK (precio_unitario >= 0);
+        ALTER TABLE movimientos ADD COLUMN nota TEXT NOT NULL DEFAULT '';
+        CREATE INDEX IF NOT EXISTS idx_mov_fecha ON movimientos(fecha DESC);
+      `);
+    }
+
+    await tx.execAsync(`PRAGMA user_version = ${VERSION_ESQUEMA}`);
+  });
 }

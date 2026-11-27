@@ -1,4 +1,4 @@
-import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
   Keyboard,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite';
+import { SQLiteProvider, useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { migrar } from './src/db/schema';
 import { buscarPorCodigo, type Producto } from './src/db/inventario';
 import { Cargando, ErrorEstado } from './src/components/Estados';
@@ -211,13 +211,30 @@ function ContenedorPrincipal() {
 }
 
 export default function Raiz() {
+  const [errorDb, setErrorDb] = useState<Error | null>(null);
+  const [intento, setIntento] = useState(0);
+  const [iniciando, setIniciando] = useState(true);
+  const inicializar = useCallback(async (db: SQLiteDatabase) => {
+    await migrar(db);
+    setIniciando(false);
+  }, []);
+
   return (
     <ProveedorTema>
-      <Suspense fallback={<Cargando texto="Inicializando motor SQLite…" />}>
-        <SQLiteProvider databaseName="bodega.db" onInit={migrar} useSuspense>
-          <ContenedorPrincipal />
-        </SQLiteProvider>
-      </Suspense>
+      {errorDb ? (
+        <ErrorEstado mensaje={`No se pudo abrir la bodega: ${errorDb.message}`} onReintentar={() => {
+          setIniciando(true);
+          setIntento((n) => n + 1);
+          setErrorDb(null);
+        }} />
+      ) : (
+        <>
+          {iniciando ? <Cargando texto="Inicializando motor SQLite…" /> : null}
+          <SQLiteProvider key={intento} databaseName="bodega.db" onInit={inicializar} onError={setErrorDb}>
+            <ContenedorPrincipal />
+          </SQLiteProvider>
+        </>
+      )}
     </ProveedorTema>
   );
 }

@@ -62,6 +62,7 @@ export function PantallaProducto({
   const enVuelo = useRef(false);
 
   const refrescar = useCallback(async () => {
+    setError(null);
     try {
       const p = await buscarPorCodigo(db, codigo);
       setProducto(p);

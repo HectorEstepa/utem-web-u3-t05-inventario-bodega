@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { validarMovimiento, validarPrecio } from '../lib/stock';
+import { validarMovimiento, validarPrecio } from '../lib/stock.ts';
+import { procesarLectura } from '../lib/gtin.ts';
 
 export interface Producto {
   codigo: string;
@@ -109,8 +110,17 @@ export async function crearProducto(
     precio?: number;
   }
 ): Promise<void> {
-  const { codigo, nombre, stockInicial, minimo, precio = 0 } = datos;
+  const { nombre, stockInicial, minimo, precio = 0 } = datos;
+  const lectura = procesarLectura(datos.codigo);
+  if (!lectura.ok) throw new Error('El código GTIN no es válido. Revisa sus dígitos.');
+  const codigo = lectura.codigo;
   if (!nombre.trim()) throw new Error('El nombre del producto no puede ir vacío.');
+  if (!Number.isInteger(stockInicial) || stockInicial < 0 || stockInicial > 99999) {
+    throw new Error('El stock inicial debe ser un entero entre 0 y 99.999.');
+  }
+  if (!Number.isInteger(minimo) || minimo < 1 || minimo > 99999) {
+    throw new Error('El stock mínimo debe ser un entero entre 1 y 99.999.');
+  }
   const errPrecio = validarPrecio(precio);
   if (errPrecio) throw new Error(errPrecio);
 
@@ -265,9 +275,8 @@ export async function listarMovimientosGlobales(
 }
 
 /**
- * Calcula en dos agregaciones SQL nativas todas las métricas del Dashboard
- * Ejecutivo y Técnico en < 10 ms sobre miles de filas, sin cargar arreglos
- * gigantes en la memoria de JavaScript.
+ * Calcula las métricas con dos agregaciones y una consulta de los cinco
+ * productos de mayor valor. Su duración debe medirse en el dispositivo.
  */
 export async function obtenerResumenEjecutivo(db: SQLiteDatabase): Promise<ResumenEjecutivo> {
   const [aggProd, aggMov, top] = await Promise.all([
@@ -343,7 +352,7 @@ export async function obtenerResumenEjecutivo(db: SQLiteDatabase): Promise<Resum
 }
 
 /**
- * Carga un lote realista de abarrotes chilenos con GTIN-13 válidos cuando la
+ * Carga un lote ficticio con códigos de dígito verificador válido cuando la
  * bodega está vacía y el usuario desea probar el dashboard y la exportación
  * inmediatamente.
  */
@@ -359,8 +368,8 @@ export async function sembrarCatalogoDemo(db: SQLiteDatabase): Promise<void> {
     { codigo: '4006381333931', nombre: 'Destacador Escolar Amarillo', stock: 24, minimo: 6, precio: 1290, salidasDemo: 8 },
     { codigo: '5012345670003', nombre: 'Café Tostado Molido 250 g', stock: 3, minimo: 5, precio: 4890, salidasDemo: 9 },
     { codigo: '0036000291452', nombre: 'Pañuelos Desechables Pack x6', stock: 0, minimo: 4, precio: 2190, salidasDemo: 6 },
-    { codigo: '7801610001625', nombre: 'Bebida Cola Retornable 2 L', stock: 18, minimo: 8, precio: 1950, salidasDemo: 12 },
-    { codigo: '7802900001015', nombre: 'Arroz Grado 1 Selección 1 kg', stock: 4, minimo: 6, precio: 1690, salidasDemo: 10 },
+    { codigo: '7801610001622', nombre: 'Bebida Cola Retornable 2 L', stock: 18, minimo: 8, precio: 1950, salidasDemo: 12 },
+    { codigo: '7802900001018', nombre: 'Arroz Grado 1 Selección 1 kg', stock: 4, minimo: 6, precio: 1690, salidasDemo: 10 },
   ];
 
   await db.withExclusiveTransactionAsync(async (tx) => {
