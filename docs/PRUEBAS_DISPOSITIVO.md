@@ -74,3 +74,14 @@ Un fallo también es evidencia: registrar mensaje, pasos para reproducir, intent
 | P25 | Editar cantidad 10→8 con motivo; luego 8→0 y 0→5 | Stock actualizado; Ajuste con saldos, motivo y fecha; entradas/salidas sin cambio | Pendiente |
 | P26 | Guardar sin motivo, cantidad vacía, cancelar, guardar sin variar cantidad y doble toque | Error legible sin cambios parciales; cancelar/sin diferencia no crean ajuste; doble toque no duplica | Pendiente |
 | P27 | Actualizar sobre v2 con datos; exportar corrección y abrir Excel | Se conservan fichas/IDs; AJUSTE con saldos, motivo, diferencia y sin subtotal de flujo; probar ambos temas y lector de pantalla | Pendiente |
+
+## Ajuste visual v1.5.1
+
+- Comprobar en ambos temas que las salidas son violetas en Inicio, Dashboard, ficha e historial.
+- Inicio: fechas y montos deben estar dentro de la misma tarjeta, incluso en pantalla estrecha.
+- Dashboard: seleccionar Entradas/Salidas cambia una sola línea, título, escala, tooltip y Tabla.
+- Elegir un rango sin actividad: ambos totales CLP y unidades son cero, al igual que los puntos. Elegir Todo los restablece; Inicio coincide al volver.
+- El stock actual permanece identificado como actual, separado de los totales del período.
+- Verificar la versión en Ajustes: 1.5.1; reiniciar Metro desde la carpeta actualizada.
+
+Estado: interacción física pendiente.

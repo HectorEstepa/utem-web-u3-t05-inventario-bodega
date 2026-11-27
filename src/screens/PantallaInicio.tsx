@@ -1,3 +1,4 @@
+import { ResumenFlujos } from '../components/ResumenFlujos';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -168,40 +169,7 @@ export function PantallaInicio({
         </Pressable>
       </View>
 
-      <Pressable onPress={onIrDashboard} accessibilityRole="button" style={{ gap: 4 }}>
-        <Text style={{ color: paleta.texto, fontWeight: '800' }}>Movimientos · {periodo.etiqueta}</Text>
-        <Text style={{ color: paleta.textoSecundario }}>{periodo.detalle}</Text>
-        {periodo.desde === null && resumen.primeraFecha !== null && resumen.ultimaFecha !== null ? (
-          <Text style={{ color: paleta.textoSecundario }}>Registros: {new Date(resumen.primeraFecha).toLocaleDateString('es-CL')} — {new Date(resumen.ultimaFecha).toLocaleDateString('es-CL')}</Text>
-        ) : null}
-        <Text style={{ color: paleta.acento }}>Cambiar fechas en Dashboard ›</Text>
-      </Pressable>
-      {/* Flujos del período compartido */}
-      <Pressable
-        onPress={onIrDashboard}
-        style={({ pressed }) => [
-          s.tiraResumen,
-          { backgroundColor: paleta.superficie, borderColor: paleta.borde },
-          pressed && { opacity: 0.8 },
-        ]}
-      >
-        <View style={s.tiraCol}>
-          <Text style={[s.tiraLbl, { color: paleta.textoTerciario }]}>SALIDAS / DESPACHOS</Text>
-          <Text style={[s.tiraVal, { color: paleta.salida }]}>
-            {formatearCLP(resumen.salidasMontoCLP)}
-          </Text>
-          <Text style={{ color: paleta.textoSecundario }}>{resumen.salidasUnidades} unidades</Text>
-        </View>
-        <View style={[s.divisorVert, { backgroundColor: paleta.separador }]} />
-        <View style={s.tiraCol}>
-          <Text style={[s.tiraLbl, { color: paleta.textoTerciario }]}>ENTRADAS</Text>
-          <Text style={[s.tiraVal, { color: paleta.verde }]}>
-            {formatearCLP(resumen.entradasMontoCLP)}
-          </Text>
-          <Text style={{ color: paleta.textoSecundario }}>{resumen.entradasUnidades} unidades</Text>
-        </View>
-        <Ionicons name="bar-chart-outline" size={20} color={paleta.acento} />
-      </Pressable>
+      <ResumenFlujos resumen={resumen} onCambiarFechas={onIrDashboard} />
 
       <Pressable onPress={onHistorial} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
         <Text style={{ color: paleta.acento, fontWeight: '700' }}>Ver historial de movimientos ›</Text>

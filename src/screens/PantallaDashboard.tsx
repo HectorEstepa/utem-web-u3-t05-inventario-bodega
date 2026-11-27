@@ -1,3 +1,4 @@
+import { ResumenFlujos } from '../components/ResumenFlujos';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GraficoEvolucion } from '../components/GraficoEvolucion';
 import { obtenerEvolucion, type Evolucion } from '../db/evolucion';
@@ -140,8 +141,12 @@ export function PantallaDashboard({
         </Pressable>
       </View>
 
-      <SelectorPeriodo />
-      <GraficoEvolucion key={periodo.detalle} datos={evolucion} />
+      <View style={{ gap: 10 }}>
+        <Text style={{ color: paleta.texto, fontSize: 20, fontWeight: '800' }}>Movimientos del período</Text>
+        <SelectorPeriodo />
+        <ResumenFlujos resumen={resumen} />
+        <GraficoEvolucion key={periodo.detalle} datos={evolucion} />
+      </View>
       {periodo.desde === null && resumen.primeraFecha !== null && resumen.ultimaFecha !== null ? (
         <Text style={{ color: paleta.textoSecundario }}>Registros incluidos: {new Date(resumen.primeraFecha).toLocaleString('es-CL')} — {new Date(resumen.ultimaFecha).toLocaleString('es-CL')}</Text>
       ) : null}
@@ -201,43 +206,6 @@ export function PantallaDashboard({
           </View>
 
           <Text style={{ color: paleta.textoSecundario }}>Stock actualizado {actualizado.toLocaleString('es-CL')}. Flujos: {periodo.detalle}.</Text>
-
-          {/* KPIs de Flujo: Salidas/Ventas vs Entradas/Compras */}
-          <View style={s.gridDos}>
-            <View
-              style={[
-                s.kpiCard,
-                { backgroundColor: paleta.superficie, borderColor: paleta.borde },
-              ]}
-            >
-              <Text style={[s.kpiLabel, { color: paleta.textoTerciario }]}>
-                SALIDAS / DESPACHOS
-              </Text>
-              <Text style={[s.kpiValor, { color: paleta.salida }]}>
-                {formatearCLP(resumen.salidasMontoCLP)}
-              </Text>
-              <Text style={[s.kpiMeta, { color: paleta.textoSecundario }]}>
-                ▼ {resumen.salidasUnidades.toLocaleString('es-CL')} unidades despachadas
-              </Text>
-            </View>
-
-            <View
-              style={[
-                s.kpiCard,
-                { backgroundColor: paleta.superficie, borderColor: paleta.borde },
-              ]}
-            >
-              <Text style={[s.kpiLabel, { color: paleta.textoTerciario }]}>
-                ENTRADAS / RECEPCIÓN
-              </Text>
-              <Text style={[s.kpiValor, { color: paleta.verde }]}>
-                {formatearCLP(resumen.entradasMontoCLP)}
-              </Text>
-              <Text style={[s.kpiMeta, { color: paleta.textoSecundario }]}>
-                ▲ {resumen.entradasUnidades.toLocaleString('es-CL')} unidades ingresadas
-              </Text>
-            </View>
-          </View>
 
           {/* Distribución de Salud de Stock */}
           <View

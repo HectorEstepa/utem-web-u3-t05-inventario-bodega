@@ -1,6 +1,6 @@
 # Manual de usuario: inventario de bodega
 
-Aplicación v1.5.0. Dirigido al encargado y al operador de una bodega. Describe la versión actual: inventario local, un teléfono como registro operativo y cantidades enteras. No incluye sincronización, facturación ni respaldo/restauración.
+Aplicación v1.5.1. Dirigido al encargado y al operador de una bodega. Describe la versión actual: inventario local, un teléfono como registro operativo y cantidades enteras. No incluye sincronización, facturación ni respaldo/restauración.
 
 ## 1. Qué se entrega al operador
 
@@ -80,7 +80,7 @@ Son alertas visuales dentro de la app. No se envían correos, avisos push, pedid
 5. Abrir **Historial** desde Inicio/Dashboard o desde la ficha. Buscar por nombre, GTIN o nota, elegir tipo y cargar más páginas. Cada fila incluye fecha, hora e ID. Desde la ficha se restringe a ese producto.
 6. Para exportar, confirmar primero el período en Dashboard. El botón de exportación de Ajustes utiliza ese mismo período. Los filtros de búsqueda y tipo del historial no restringen el Excel: exporta todas las entradas, salidas y ajustes de las fechas elegidas.
 
-En **Evolución de movimientos**, tocar o deslizar el gráfico para ver las unidades de cada intervalo en la tarjeta superior, con sus fechas. Entradas: verde y línea continua. Salidas: violeta y línea discontinua. Las flechas cambian de intervalo y **Tabla** muestra los mismos valores en una lista desplazable. Los períodos cortos (hasta 120 días) usan días; hasta ocho años, meses; los mayores, años. Los puntos suman unidades de cada intervalo, sin acumular; cero indica ausencia de actividad. No muestran la evolución histórica del stock. Los ajustes no se cuentan como entradas ni salidas. Los totales no dependen del filtro de tipo usado en la vista previa del historial.
+En **Evolución de movimientos**, tocar o deslizar el gráfico para ver las unidades de cada intervalo en la tarjeta superior, con sus fechas. Elegir **Entradas** o **Salidas** para ver sus gráficos por separado en el mismo apartado. Entradas es verde y Salidas violeta. Al cambiar el período, los montos y unidades de las tarjetas superiores se recalculan con las mismas fechas. La tarjeta de Inicio incluye el rango dentro de su recuadro. Las flechas cambian de intervalo y **Tabla** muestra los mismos valores en una lista desplazable. Los períodos cortos (hasta 120 días) usan días; hasta ocho años, meses; los mayores, años. Los puntos suman unidades de cada intervalo, sin acumular; cero indica ausencia de actividad. No muestran la evolución histórica del stock. Los ajustes no se cuentan como entradas ni salidas. Los totales no dependen del filtro de tipo usado en la vista previa del historial.
 
 La selección es de sesión: al reiniciar el proceso vuelve al mes actual. Las salidas son violetas; no indican pérdidas. Rojo identifica errores, eliminación y stock agotado.
 
