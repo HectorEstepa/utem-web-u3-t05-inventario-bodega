@@ -1,0 +1,125 @@
+# Manual de usuario: inventario de bodega
+
+Aplicación v1.3.0. Dirigido al encargado y al operador de una bodega. Describe la versión actual: inventario local, un teléfono como registro operativo y cantidades enteras. No incluye sincronización, facturación ni respaldo/restauración.
+
+## 1. Qué se entrega al operador
+
+El mantenedor debe entregar una app independiente instalada en un teléfono aprobado, identificar la versión y enseñar este flujo. El operador no necesita GitHub, Node, una cuenta Expo ni el computador del desarrollador para operar ese binario. Expo Go y su QR son el método de prueba del equipo de desarrollo; no constituyen la instalación de la empresa.
+
+El piloto debe llevar un registro de referencia en paralelo mientras no exista una restauración de respaldo probada. Los datos de demostración y las pruebas deben mantenerse fuera del inventario real.
+
+## 2. Preparar la bodega por primera vez
+
+1. El encargado elige el teléfono y la persona responsable del inventario. Define una sola unidad de control por producto: por ejemplo, unidades individuales, no mezclar cajas con unidades.
+2. El mantenedor instala y prueba la app en ese equipo. El encargado verifica la fecha y hora del teléfono, porque los movimientos usan ese reloj.
+3. Abrir **Inicio**. Una instalación nueva debe mostrar la bodega vacía. No tocar **Cargar catálogo demostrativo** para comenzar una operación real.
+4. Contar físicamente los productos antes de crear sus fichas. Durante ese conteo, acordar cómo se registrarán las recepciones y despachos para evitar que se pierdan movimientos.
+5. Tocar **Escanear**, leer la explicación y permitir la cámara. Si se rechaza el permiso o la etiqueta está dañada, usar **Ingreso manual** y escribir los números bajo las barras.
+6. Para un código desconocido, completar **Nuevo producto**: nombre reconocible, precio unitario CLP, stock inicial contado y mínimo de alerta. Guardar y revisar la ficha.
+7. Repetir con los artículos del alcance inicial y comprobar cantidades/precios en **Inventario**.
+8. Revisar con el encargado que no haya datos de prueba y que el saldo de la app coincida con el conteo. Registrar esa fecha de inicio en el control del piloto.
+
+**El stock inicial ya se registra como una entrada.** No registrar otra entrada por esas mismas unidades al terminar el alta.
+
+## 3. Reconocer las pantallas
+
+| Pantalla | Uso |
+| --- | --- |
+| Inicio | Ver resumen local, accesos a lectura/manual y alertas de reposición |
+| Inventario | Buscar por nombre/código, filtrar críticos/agotados y abrir fichas |
+| Escanear | Leer EAN-13, EAN-8 o UPC-A con la cámara; usar linterna si hace falta |
+| Ficha del producto | Ver saldo, mínimo y precio; registrar entradas/salidas y consultar movimientos recientes |
+| Dashboard | Ver indicadores acumulados, productos y actividad local; no reemplaza contabilidad |
+| Ajustes | Cambiar apariencia, revisar permiso, exportar Excel, abrir diagnóstico y gestionar datos |
+
+## 4. Recibir mercadería: entrada
+
+1. Contar las unidades efectivamente recibidas. Identificar si el código pertenece a la unidad o a una caja; no asumir que son equivalentes.
+2. Escanear o escribir el código. Verificar nombre y código en la ficha antes de registrar.
+3. Si el artículo no existe, darlo de alta. Si la recepción completa se indicó como stock inicial, no repetirla como entrada.
+4. En la ficha, escribir la cantidad recibida y, si procede, una nota breve de referencia, por ejemplo «Recepción OC 125». Evitar datos personales en las notas.
+5. Elegir **Entrada** y esperar la confirmación. Revisar nuevo saldo e historial.
+
+Ejemplo: saldo 10, entrada 3 → saldo 13. Escanear repetidamente el envase no agrega unidades: el stock cambia al confirmar el movimiento.
+
+## 5. Despachar mercadería: salida
+
+1. Abrir la ficha por escaneo o búsqueda y confirmar que sea el producto correcto.
+2. Escribir la cantidad realmente despachada y la nota de referencia si corresponde.
+3. Elegir **Salida** y esperar confirmación. Comprobar saldo e historial antes de atender el siguiente movimiento.
+4. Si se rechaza por falta de stock, revisar producto, cantidad, recepciones no registradas y conteo físico. No inventar una entrada para eludir el control.
+
+Ejemplo: saldo 13, salida 8 → saldo 5. Si el mínimo es 5, aparece **STOCK BAJO**. Una salida de 6 con saldo 5 se rechaza y conserva el saldo.
+
+Los botones de cantidades rápidas facilitan escribir unidades; comprobar siempre el tipo de movimiento. Una etiqueta escaneada no equivale a una venta cobrada ni a una factura emitida.
+
+## 6. Interpretar las alertas
+
+| Estado | Regla | Acción del encargado |
+| --- | --- | --- |
+| AGOTADO | Stock 0 | Verificar físicamente y organizar reposición; no despachar unidades inexistentes |
+| STOCK BAJO | Stock mayor que 0 y menor o igual al mínimo | Revisar demanda y planificar reposición |
+| EN STOCK | Stock sobre el mínimo | Continuar control habitual |
+
+Son alertas visuales dentro de la app. No se envían correos, avisos push, pedidos automáticos ni notificaciones a proveedores. El encargado debe revisar los críticos regularmente. El mínimo lo define el negocio; no lo calcula la aplicación.
+
+## 7. Buscar, editar y consultar historial
+
+- En **Inventario**, escribir parte del nombre o código. Probar **Todos**, **Críticos** y **Agotados** según la tarea.
+- Abrir la ficha y usar **Editar** para cambiar nombre, precio o mínimo. El stock se modifica mediante movimientos, no editando el número directamente.
+- Al modificar el precio, los movimientos anteriores conservan el precio unitario que tenían al registrarse. La valorización del inventario usa el precio actual.
+- La ficha muestra movimientos recientes (hasta 15). El dashboard también limita los mostrados. No confundir el límite visual con el total almacenado.
+- La app no identifica al trabajador que hizo cada movimiento y no impide editar/eliminar datos por rol. Para un piloto, el encargado debe definir quién puede operar el teléfono.
+
+## 8. Equivocaciones y diferencias de conteo
+
+No hay edición, anulación ni deshacer de movimientos. Si se anotó una entrada o salida equivocada, el encargado puede autorizar un **movimiento compensatorio** después de comprobar el caso y dejar una nota que explique la corrección. No alterar el historial con herramientas técnicas para ocultarlo.
+
+Ejemplo: se ingresaron 10 unidades pero llegaron 8; comprobar el saldo y registrar una salida de 2 con una nota de ajuste autorizada. Si hay diferencia entre stock físico y app, investigar recepciones, despachos y unidad de medida antes del ajuste. La nota no sustituye una auditoría firmada ni identifica de forma segura al responsable.
+
+No usar **Eliminar producto** para corregir cantidades: elimina también su historial. **Vaciar toda la bodega** elimina todos los productos y movimientos del teléfono, después de confirmación. La app no tiene papelera ni restauración.
+
+## 9. Reportes y cierre de jornada
+
+1. Revisar movimientos pendientes y resolver diferencias con el registro de referencia del piloto.
+2. Revisar críticos/agotados y comunicar necesidades de reposición por el canal habitual del negocio.
+3. En **Ajustes**, tocar **Exportar inventario y movimientos (.xlsx)**.
+4. En el diálogo del teléfono, elegir guardar o compartir. Abrir el archivo guardado y verificar que se pueda leer: cerrar el diálogo no garantiza que se haya conservado una copia fuera de la app.
+5. Guardar el reporte con fecha en el lugar acordado por la empresa y registrar quién lo revisó. El archivo temporal que genera la app está en caché y no es archivo permanente.
+
+El libro incluye resumen ejecutivo, inventario y hasta los **últimos 2.000 movimientos**. El resumen considera todo el historial: puede no coincidir con los totales de la hoja de movimientos cuando haya más de 2.000. Las sumas de entradas y salidas representan actividad, no utilidad ni saldo neto; el saldo se consulta en inventario.
+
+El reporte no contiene una restauración de SQLite ni puede importarse para recuperar el teléfono. No incluye impuestos, facturas, costos históricos completos ni cálculo de utilidades. No presentarlo como sistema contable.
+
+## 10. Usar sin internet y conservar datos
+
+En una app independiente instalada, escaneo, consulta, alta, movimientos e historial se ejecutan en el teléfono sin internet. Compartir por correo/nube puede necesitar conexión. Cerrar la app o reiniciar el equipo no borra el inventario.
+
+Cada instalación conserva su propia base `bodega.db`. Dos teléfonos no se sincronizan aunque usen el mismo usuario Expo. El código de GitHub no contiene las existencias del negocio. Al pasar de Expo Go a una app independiente se comienza con otro almacenamiento, sin migración automática.
+
+No desinstalar ni borrar datos para resolver un error. Antes de cambiar de equipo o actualizar, consultar al mantenedor; no hay recuperación automática garantizada. Si el teléfono se pierde y no hay un respaldo recuperable externo, no se puede prometer restaurar su inventario.
+
+## 11. Si algo falla
+
+| Problema | Acción |
+| --- | --- |
+| Cámara no permitida | Usar ingreso manual; habilitar cámara en Ajustes del teléfono si el encargado lo permite |
+| Código inválido | Revisar números y tipo; se aceptan GTIN de 8, 12 o 13 dígitos con verificador válido |
+| QR o etiqueta Code128 | No están soportados por este flujo; no crear códigos arbitrarios para saltar validación |
+| Código válido pero nuevo | Crear ficha tras comprobar que no sea otro envase/unidad del mismo artículo |
+| Fallo al guardar/abrir base | Leer mensaje, no asumir éxito, reintentar y verificar saldo/historial; si persiste, detener movimientos y contactar soporte |
+| Teléfono sin espacio | Detener operación y pedir asistencia; no borrar datos de la app para liberar espacio |
+| Falla exportación | Verificar almacenamiento y opciones de compartir; continuar el registro de referencia, sin llamar al Excel un respaldo |
+| Saldo físico distinto | Investigar y autorizar un ajuste; no eliminar fichas para ocultar diferencias |
+
+El encargado comunica a soporte versión de la app, modelo/SO, acción, hora, mensaje y si el saldo cambió. Compartir capturas sin información sensible innecesaria. Si no está claro si un movimiento se guardó, consultar la ficha antes de repetirlo para evitar duplicar la operación.
+
+## 12. Límites de los datos
+
+- Cantidades de movimiento: enteros entre 1 y 99.999. No hay kilos/litros fraccionados ni conversiones automáticas caja/unidad.
+- Stock inicial: de 0 a 99.999; mínimo: de 1 a 99.999; precio CLP: entero de 0 a 99.999.999.
+- Nota de movimiento: hasta 80 caracteres guardados. Identificar referencias operativas, no información personal innecesaria.
+- Sin lotes, vencimientos, series, ubicaciones, órdenes de compra, múltiples bodegas ni proveedores.
+- Sin sesiones/roles, trazabilidad de operador, servidor ni recuperación completa desde la interfaz.
+
+Para organizar un piloto y evaluar el paso a producción, continuar con [Operación y entrega a una empresa](OPERACION_EMPRESA.md).

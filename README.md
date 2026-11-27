@@ -6,6 +6,63 @@
 
 App Android/iOS para registrar recepción y despacho de productos desde un teléfono. Lee EAN-13, EAN-8 y UPC-A, permite crear productos desconocidos, conserva el inventario en SQLite y muestra alertas cuando el stock alcanza el mínimo. El ingreso manual permite trabajar sin permiso de cámara.
 
+**Estado para empresas: piloto local de un solo dispositivo.** La aplicación todavía no debe ser el único registro de un inventario real: no incluye respaldo/restauración de la base, cuentas de operadores ni sincronización. La documentación describe la versión disponible y sus límites; no certifica una puesta en producción.
+
+## Empezar según tu función
+
+| Quién lo usa | Qué necesita | Guía |
+| --- | --- | --- |
+| Bodeguero u operador | App instalada y teléfono con cámara; no necesita Git, Node ni una cuenta Expo | [Manual de usuario](docs/MANUAL_USUARIO.md) |
+| Encargado de la empresa | Definir dispositivo, responsables, conteo inicial, resguardo y prueba de aceptación | [Operación y entrega a una empresa](docs/OPERACION_EMPRESA.md) |
+| Desarrollador o mantenedor | Código, Node/npm y Expo; firma y distribución para entregar la app | [Ejecución de desarrollo](#ejecutar-en-un-teléfono) y [compilación](#apk-para-prueba-física) |
+
+## ¿Necesita internet siempre?
+
+| Situación | Conectividad necesaria |
+| --- | --- |
+| App independiente instalada: escanear, alta, buscar, entrada/salida, alertas e historial | No. Las operaciones son locales. |
+| Abrir de nuevo la app independiente con el computador apagado | No. El código se incluye en el binario instalado. Debe comprobarse en el teléfono de destino. |
+| Expo Go: abrir desde el QR de `npx expo start` | El teléfono necesita llegar al servidor Metro del computador. La autenticación de Expo en iPhone requiere conexión al servicio. Es un entorno de desarrollo. |
+| Usar `--tunnel` | Sí, teléfono y computador necesitan internet. |
+| Instalar dependencias, iniciar sesión Expo, compilar en EAS o descargar un instalador | Sí, para esos servicios. |
+| Generar Excel y guardarlo en el teléfono | La generación es local; depende de las opciones de guardado disponibles en el sistema. |
+| Enviar Excel por correo o guardarlo en una nube | Depende de la aplicación elegida; normalmente necesita internet. |
+
+**Trabajar sin internet no significa tener respaldo.** Un teléfono perdido o una instalación borrada puede dejarte sin el inventario. Tampoco hay actualización automática del stock en otros teléfonos.
+
+## ¿Dónde está la base de datos?
+
+- `App.tsx` abre **`bodega.db`** mediante `SQLiteProvider`. Al primer uso se crean tablas y, en aperturas posteriores, se usa la misma base y se aplican migraciones si corresponden.
+- Vive en el **almacenamiento privado de la aplicación en ese teléfono**, dentro del directorio predeterminado de `expo-sqlite` (`defaultDatabaseDirectory`). La ruta absoluta depende del sistema y de la instalación; no es una carpeta del repositorio ni del computador.
+- En Expo Go está dentro del entorno de Expo Go para ese proyecto; en una APK o app iOS independiente pertenece a esa instalación. **Pasar de Expo Go a una app instalada no migra los datos automáticamente.**
+- `productos` conserva código, nombre, stock, mínimo, precio y fecha de alta; `movimientos` conserva entradas/salidas, cantidades, precio histórico, nota y fecha. Las preferencias visuales se guardan aparte con AsyncStorage.
+- Los datos **no se suben a GitHub, Expo ni a un servidor de la empresa** por las operaciones del inventario. Iniciar sesión con la misma cuenta en dos teléfonos no comparte sus bases.
+- Cerrar la app o reiniciar el teléfono conserva los datos. Desinstalar, borrar datos de la app o usar **Vaciar toda la bodega** puede eliminarlos. No se garantiza recuperación mediante copias del sistema operativo.
+- No hay exportación/importación de respaldo de SQLite desde la interfaz. Excel es un reporte y **no permite restaurar la base en esta versión**.
+
+Referencia técnica: [SQLite en Expo](https://docs.expo.dev/versions/v58.0.0/sdk/sqlite/). Para diagnóstico, el mantenedor puede consultar `db.databasePath`; no debe copiar solo `bodega.db` mientras está abierto en WAL, porque podría omitir cambios del archivo de registro.
+
+## Flujo de trabajo en la bodega
+
+```mermaid
+flowchart TD
+  A[Escanear o ingresar código] --> B{¿GTIN válido?}
+  B -- No --> C[Mostrar error y corregir lectura]
+  B -- Sí --> D{¿Existe en la base local?}
+  D -- No --> E[Alta: nombre, stock inicial, mínimo y precio]
+  E --> F[Ficha del producto]
+  D -- Sí --> F
+  F --> G[Elegir entrada o salida, cantidad y nota]
+  G --> H{¿Movimiento válido?}
+  H -- No --> I[Mostrar error y conservar saldo]
+  H -- Sí --> J[Guardar saldo e historial en una transacción]
+  J --> K[Mostrar saldo y alerta normal, bajo o agotado]
+```
+
+Escanear **solo abre la ficha o el alta**: no suma ni descuenta stock por sí mismo. El operador registra explícitamente el movimiento y revisa la confirmación. Un código válido no consulta catálogos externos ni rellena automáticamente el nombre o precio.
+
+Para la primera puesta en marcha: contar físicamente, crear los productos con ese saldo inicial, revisar los resultados y comenzar los movimientos diarios. El alta ya registra el stock inicial como entrada; no volver a ingresarlo como otra recepción. El [manual](docs/MANUAL_USUARIO.md) detalla recepción, despacho, conteo, errores y cierre diario.
+
 La base del fork procede de [waltZk8/utem-web-u3-t05-inventario-bodega](https://github.com/waltZk8/utem-web-u3-t05-inventario-bodega). Se conserva esa procedencia y se añaden correcciones y verificaciones. El equipo debe explicar qué partes desarrolló y cuáles adaptó.
 
 > **Estado de entrega:** los requisitos funcionales de T05 están implementados y hay verificaciones automatizadas. Faltan evidencias en teléfono físico, resultados propios de medición, video y PDF final. La presentación contiene campos pendientes. Consulta [la revisión de la pauta](docs/REVISION_PAUTA.md).
@@ -15,18 +72,36 @@ La base del fork procede de [waltZk8/utem-web-u3-t05-inventario-bodega](https://
 Requisitos: Node.js 22.13 o superior (verificado con Node 24.20.0), npm, Git y Expo Go compatible con SDK 58. Android e iOS son los objetivos; la presentación HTML no es la app móvil.
 
 ```bash
-git clone https://github.com/HectorEstepa/utem-web-u3-t05-inventario-bodega.git
+git clone --branch revision-t05-pauta https://github.com/HectorEstepa/utem-web-u3-t05-inventario-bodega.git
 cd utem-web-u3-t05-inventario-bodega
 npm ci
 npm run tipos
 npm test
 npx expo install --check
-npm start
+npx expo login
+npx expo whoami
+npx expo start --go
 ```
 
-En Android, abre Expo Go y escanea el QR; en iOS, usa la cámara del sistema. El computador y el teléfono deben estar en una red que permita comunicarlos. Si la red los aísla, usa `npx expo start --tunnel` y acepta instalar la dependencia de túnel si Expo la solicita. La conexión carga el proyecto en desarrollo; las operaciones de inventario son locales.
+Estas instrucciones usan la rama de la revisión, mientras el PR #1 siga sin integrar a `main`. En Android, abre Expo Go y escanea el QR; en iOS, inicia sesión en Expo Go con la **misma cuenta** que muestra `whoami` y usa la cámara del sistema. El computador y el teléfono deben estar en una red que permita comunicarlos. Si la red los aísla, usa `npx expo start --go --tunnel` y acepta instalar la dependencia de túnel si Expo la solicita. La conexión carga el proyecto en desarrollo; las operaciones de inventario son locales.
+
+Si ya clonaste esta rama, detén Metro con `Ctrl+C`, entra en tu carpeta del proyecto y actualiza con `git pull --ff-only`, `npm ci` y `npx expo start --go --clear`. Si Git informa cambios locales, consérvalos y revísalos antes de actualizar; no uses un reset para borrarlos.
 
 Para comprobar persistencia sin Metro, usa un binario instalado. No borres datos de Expo Go ni desinstales la app durante la prueba: eso elimina su almacenamiento.
+
+### Interpretar la terminal de Expo
+
+| Mensaje | Qué significa y qué hacer |
+| --- | --- |
+| `Logged in` / `whoami` muestra tu usuario | La sesión del computador está iniciada; falta comprobar la sesión de Expo Go en el teléfono. |
+| `Metro waiting on exp://...` y QR | El servidor está escuchando. Mantener la terminal abierta durante la prueba. |
+| `iOS Bundled ...` | Se generó el código de iOS; no prueba por sí solo que cámara, base o interfaz funcionen. |
+| `You're signed in to Expo CLI ... but not signed in to Expo Go` | Abrir el perfil de Expo Go en el iPhone e iniciar sesión con ese mismo usuario, luego volver a abrir el QR. |
+| `The Internet connection appears to be offline` | Revisar conectividad/autenticación inicial de Expo, Wi-Fi y acceso al computador. Si la red local aísla equipos, usar túnel con internet. No demuestra un fallo de SQLite. |
+| Aviso de `SafeAreaView` obsoleto | Actualizar esta rama y reinstalar dependencias; ahora usa `react-native-safe-area-context`. |
+| Pide `react-dom` o `react-native-web` | Se intentó abrir la app como web. Esta versión solo tiene como destino Android/iOS: usar Expo Go, no `w`. La presentación `docs/index.html` sí se abre en navegador y es un recurso separado. |
+
+Guía oficial para [sesiones de Expo Go en iPhone](https://docs.expo.dev/troubleshooting/expo-go-sign-in-required/).
 
 ## Demostración del tema 5
 
@@ -90,11 +165,21 @@ Con cuenta Expo y EAS configurado para **su propio proyecto**:
 
 ```bash
 npx eas-cli login
+npx eas-cli whoami
+npx eas-cli init
 npx eas-cli build:configure
 npx eas-cli build --platform android --profile preview
 ```
 
 `preview` genera APK para instalación interna. La compilación se hace en EAS y puede estar sujeta a límites de la cuenta. **No se generó ni instaló un APK en esta revisión.** Para compilar Android localmente se necesita JDK/SDK compatibles con el proyecto generado por Expo; para iOS localmente, macOS y Xcode.
+
+El mantenedor entrega el enlace/instalador y las instrucciones al operador. La empresa usuaria no necesita ejecutar comandos ni iniciar Metro. Para iOS, el instalador Android no sirve: debe prepararse distribución iOS firmada y gestionar los dispositivos o el canal de distribución correspondiente. Ver [compilación](https://docs.expo.dev/build/setup/) y [distribución interna de Expo](https://docs.expo.dev/build/internal-distribution/).
+
+## Requisitos antes de una puesta en producción
+
+La versión actual permite un piloto supervisado y contrastado con un registro de referencia. Para usarla como sistema principal hacen falta, como mínimo, **respaldo completo y restauración probada**, validación del dispositivo, gestión de acceso y actualizaciones controladas. Si varias personas operan desde distintos teléfonos, también hacen falta backend, autenticación, sincronización y resolución de conflictos; instalar la app en varios equipos no implementa nada de eso.
+
+El [plan de operación](docs/OPERACION_EMPRESA.md) distingue capacidades actuales, tareas de entrega y funciones pendientes. Incluye continuidad ante pérdida del equipo, mantenimiento, responsabilidades y criterios de aceptación. No se presenta el proyecto como listo para producción por haber escrito un manual.
 
 ## Entrega académica
 

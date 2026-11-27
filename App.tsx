@@ -4,11 +4,11 @@ import {
   Keyboard,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { SQLiteProvider, useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
@@ -220,6 +220,7 @@ export default function Raiz() {
   }, []);
 
   return (
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
     <ProveedorTema>
       {errorDb ? (
         <ErrorEstado mensaje={`No se pudo abrir la bodega: ${errorDb.message}`} onReintentar={() => {
@@ -236,6 +237,7 @@ export default function Raiz() {
         </>
       )}
     </ProveedorTema>
+    </SafeAreaProvider>
   );
 }
 
