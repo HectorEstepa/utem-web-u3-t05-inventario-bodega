@@ -1,3 +1,4 @@
+import { TODO_EL_HISTORIAL, validarPeriodo, type Periodo } from '../lib/periodo.ts';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { validarMovimiento, validarPrecio } from '../lib/stock.ts';
 import { procesarLectura } from '../lib/gtin.ts';
@@ -38,6 +39,8 @@ export interface ResumenEjecutivo {
   salidasUnidades: number;
   salidasMontoCLP: number;
   totalMovimientos: number;
+  primeraFecha: number | null;
+  ultimaFecha: number | null;
   topValorizados: Array<{
     codigo: string;
     nombre: string;
@@ -241,44 +244,69 @@ export async function historial(
   limite = 25
 ): Promise<Movimiento[]> {
   return db.getAllAsync<Movimiento>(
-    'SELECT * FROM movimientos WHERE codigo = ? ORDER BY fecha DESC LIMIT ?',
+    'SELECT * FROM movimientos WHERE codigo = ? ORDER BY fecha DESC, id DESC LIMIT ?',
     codigo,
     limite
   );
 }
 
-export async function listarMovimientosGlobales(
-  db: SQLiteDatabase,
-  opciones: { tipo?: 'TODOS' | 'IN' | 'OUT'; limite?: number } = {}
-): Promise<MovimientoDetallado[]> {
-  const { tipo = 'TODOS', limite = 80 } = opciones;
-  if (tipo === 'IN' || tipo === 'OUT') {
-    return db.getAllAsync<MovimientoDetallado>(
-      `SELECT m.*, COALESCE(p.nombre, m.codigo) AS nombre_producto
-       FROM movimientos m
-       LEFT JOIN productos p ON p.codigo = m.codigo
-       WHERE m.tipo = ?
-       ORDER BY m.fecha DESC
-       LIMIT ?`,
-      tipo,
-      limite
-    );
+export interface OpcionesMovimientos {
+  tipo?: 'TODOS' | 'IN' | 'OUT';
+  periodo?: Periodo;
+  codigo?: string;
+  busqueda?: string;
+  limite?: number;
+  antesDe?: { fecha: number; id: number };
+}
+
+/** Filtro compartido por totales, historial y exportaciones; solo valores parametrizados. */
+export function filtroMovimientos(opciones: OpcionesMovimientos = {}) {
+  const { tipo = 'TODOS', periodo = TODO_EL_HISTORIAL, codigo, busqueda = '', antesDe } = opciones;
+  validarPeriodo(periodo);
+  const condiciones: string[] = [];
+  const params: Array<string | number> = [];
+  if (periodo.desde !== null) { condiciones.push('m.fecha >= ?'); params.push(periodo.desde); }
+  if (periodo.hasta !== null) { condiciones.push('m.fecha < ?'); params.push(periodo.hasta); }
+  if (tipo !== 'TODOS') { condiciones.push('m.tipo = ?'); params.push(tipo); }
+  if (codigo) { condiciones.push('m.codigo = ?'); params.push(codigo); }
+  if (busqueda.trim()) {
+    condiciones.push('(p.nombre LIKE ? OR m.codigo LIKE ? OR m.nota LIKE ?)');
+    params.push(...Array(3).fill(`%${busqueda.trim()}%`));
   }
+  if (antesDe) {
+    condiciones.push('(m.fecha < ? OR (m.fecha = ? AND m.id < ?))');
+    params.push(antesDe.fecha, antesDe.fecha, antesDe.id);
+  }
+  return { where: condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '', params };
+}
+
+export async function listarMovimientosGlobales(
+  db: SQLiteDatabase, opciones: OpcionesMovimientos = {}
+): Promise<MovimientoDetallado[]> {
+  const { where, params } = filtroMovimientos(opciones);
+  const limite = opciones.limite ?? 50;
+  if (!Number.isInteger(limite) || limite < 1 || limite > 20000) throw new Error('Límite de consulta inválido.');
   return db.getAllAsync<MovimientoDetallado>(
     `SELECT m.*, COALESCE(p.nombre, m.codigo) AS nombre_producto
-     FROM movimientos m
-     LEFT JOIN productos p ON p.codigo = m.codigo
-     ORDER BY m.fecha DESC
-     LIMIT ?`,
-    limite
+     FROM movimientos m LEFT JOIN productos p ON p.codigo = m.codigo
+     ${where} ORDER BY m.fecha DESC, m.id DESC LIMIT ?`, ...params, limite
   );
+}
+
+export async function contarMovimientos(db: SQLiteDatabase, opciones: OpcionesMovimientos = {}): Promise<number> {
+  const { where, params } = filtroMovimientos({ ...opciones, antesDe: undefined });
+  const fila = await db.getFirstAsync<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM movimientos m LEFT JOIN productos p ON p.codigo = m.codigo ${where}`, ...params
+  );
+  return fila?.n ?? 0;
 }
 
 /**
  * Calcula las métricas con dos agregaciones y una consulta de los cinco
  * productos de mayor valor. Su duración debe medirse en el dispositivo.
  */
-export async function obtenerResumenEjecutivo(db: SQLiteDatabase): Promise<ResumenEjecutivo> {
+export async function obtenerResumenEjecutivo(db: SQLiteDatabase, periodo: Periodo = TODO_EL_HISTORIAL): Promise<ResumenEjecutivo> {
+  const { where, params } = filtroMovimientos({ periodo });
   const [aggProd, aggMov, top] = await Promise.all([
     db.getFirstAsync<{
       totalSkus: number;
@@ -299,6 +327,8 @@ export async function obtenerResumenEjecutivo(db: SQLiteDatabase): Promise<Resum
     `),
     db.getFirstAsync<{
       totalMovimientos: number;
+      primeraFecha: number | null;
+      ultimaFecha: number | null;
       entradasUnidades: number;
       entradasMontoCLP: number;
       salidasUnidades: number;
@@ -306,12 +336,14 @@ export async function obtenerResumenEjecutivo(db: SQLiteDatabase): Promise<Resum
     }>(`
       SELECT
         COUNT(*) AS totalMovimientos,
+        MIN(fecha) AS primeraFecha,
+        MAX(fecha) AS ultimaFecha,
         COALESCE(SUM(CASE WHEN tipo = 'IN' THEN cantidad ELSE 0 END), 0) AS entradasUnidades,
         COALESCE(SUM(CASE WHEN tipo = 'IN' THEN cantidad * precio_unitario ELSE 0 END), 0) AS entradasMontoCLP,
         COALESCE(SUM(CASE WHEN tipo = 'OUT' THEN cantidad ELSE 0 END), 0) AS salidasUnidades,
         COALESCE(SUM(CASE WHEN tipo = 'OUT' THEN cantidad * precio_unitario ELSE 0 END), 0) AS salidasMontoCLP
-      FROM movimientos
-    `),
+      FROM movimientos m ${where}
+    `, ...params),
     db.getAllAsync<{
       codigo: string;
       nombre: string;
@@ -347,6 +379,8 @@ export async function obtenerResumenEjecutivo(db: SQLiteDatabase): Promise<Resum
     salidasUnidades: aggMov?.salidasUnidades ?? 0,
     salidasMontoCLP: aggMov?.salidasMontoCLP ?? 0,
     totalMovimientos: aggMov?.totalMovimientos ?? 0,
+    primeraFecha: aggMov?.primeraFecha ?? null,
+    ultimaFecha: aggMov?.ultimaFecha ?? null,
     topValorizados: top,
   };
 }

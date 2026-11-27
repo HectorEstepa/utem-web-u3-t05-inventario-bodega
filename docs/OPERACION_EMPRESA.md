@@ -13,7 +13,7 @@ Una bodega, un teléfono operativo y una base local por instalación. El encarga
 | App independiente | Código instalado para operar | Teléfono de la empresa |
 | SQLite `bodega.db` | Productos, stock y movimientos | Espacio privado de esa app en ese teléfono |
 | AsyncStorage | Preferencias visuales | Almacenamiento de esa app |
-| Excel exportado | Reporte con inventario/resumen y movimientos limitados | Primero caché del teléfono; después, destino donde el usuario lo guarde |
+| Excel exportado | Reporte con inventario/resumen y movimientos del período | Primero caché del teléfono; después, destino donde el usuario lo guarde |
 
 La base usa el directorio predeterminado de `expo-sqlite`, elegido por el sistema y la instalación. No se debe fijar una ruta Android/iOS universal en documentación. El mantenedor puede consultar `db.databasePath`. Las tablas se crean al abrir la app, sin instalar un servidor de bases de datos.
 
@@ -54,7 +54,7 @@ Completar con resultados reales, no marcar por anticipado. Usar datos de prueba 
 | Salida mayor al saldo | Rechazo sin alterar existencias | Pendiente |
 | Saldo al mínimo y a cero | Alertas textuales y visuales correctas | Pendiente |
 | Cierre forzado y reinicio | Saldo e historial conservados | Pendiente |
-| Reporte guardado fuera de caché | Archivo legible y alcance de 2.000 movimientos comprendido | Pendiente |
+| Reporte guardado fuera de caché | Archivo legible y período y límite de 20.000 operaciones comprendidos | Pendiente |
 | Pantalla/teclado/letra grande | Datos y acciones importantes accesibles | Pendiente |
 | Procedimiento de incidente | Operador sabe a quién llamar y cómo continuar el registro | Pendiente |
 
@@ -65,14 +65,14 @@ Registrar además el rendimiento en el equipo objetivo con [el protocolo de medi
 ### Lo que existe hoy
 
 - Persistencia SQLite local y migraciones atómicas de esquema.
-- Exportación de reportes Excel; los movimientos exportados están limitados a 2.000.
+- Exportación Excel por período: hasta 20.000 operaciones completas; por encima de ese límite se rechaza y se solicita acotar fechas. No hay truncamiento silencioso.
 - Reintento visible de errores y transacciones para saldo/historial.
 
 ### Lo que falta
 
 No hay botón de respaldo SQLite, restauración/importación, copia programada, sincronización ni recuperación de desastre. El reporte Excel no permite restaurar la app. Las copias automáticas de Android/iOS no están verificadas como mecanismo de recuperación de este proyecto.
 
-Por eso, hasta que exista una copia completa con restauración probada, realizar solo un piloto acompañado del registro de referencia. Guardar reportes fuera del dispositivo ayuda a consultar información, pero no cubre todo el historial ni recupera la base automáticamente.
+Por eso, hasta que exista una copia completa con restauración probada, realizar solo un piloto acompañado del registro de referencia. Guardar reportes fuera del dispositivo ayuda a consultar información, pero puede cubrir solo un período elegido y no recupera la base automáticamente.
 
 La política de producción debe definir quién crea copias, frecuencia según el volumen, destino independiente del teléfono, acceso, retención, verificación y responsables de restaurarlas. Una copia solo se considera operativa después de restaurarla en otro entorno y comparar productos, saldos e historial. Es un requisito pendiente de implementación y ensayo.
 

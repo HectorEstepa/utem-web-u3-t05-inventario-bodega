@@ -1,6 +1,6 @@
 # Manual de usuario: inventario de bodega
 
-Aplicación v1.3.0. Dirigido al encargado y al operador de una bodega. Describe la versión actual: inventario local, un teléfono como registro operativo y cantidades enteras. No incluye sincronización, facturación ni respaldo/restauración.
+Aplicación v1.4.0. Dirigido al encargado y al operador de una bodega. Describe la versión actual: inventario local, un teléfono como registro operativo y cantidades enteras. No incluye sincronización, facturación ni respaldo/restauración.
 
 ## 1. Qué se entrega al operador
 
@@ -29,7 +29,7 @@ El piloto debe llevar un registro de referencia en paralelo mientras no exista u
 | Inventario | Buscar por nombre/código, filtrar críticos/agotados y abrir fichas |
 | Escanear | Leer EAN-13, EAN-8 o UPC-A con la cámara; usar linterna si hace falta |
 | Ficha del producto | Ver saldo, mínimo y precio; registrar entradas/salidas y consultar movimientos recientes |
-| Dashboard | Ver indicadores acumulados, productos y actividad local; no reemplaza contabilidad |
+| Dashboard | Elegir fechas y ver movimientos del período separados del stock actual; no reemplaza contabilidad |
 | Ajustes | Cambiar apariencia, revisar permiso, exportar Excel, abrir diagnóstico y gestionar datos |
 
 ## 4. Recibir mercadería: entrada
@@ -68,8 +68,19 @@ Son alertas visuales dentro de la app. No se envían correos, avisos push, pedid
 - En **Inventario**, escribir parte del nombre o código. Probar **Todos**, **Críticos** y **Agotados** según la tarea.
 - Abrir la ficha y usar **Editar** para cambiar nombre, precio o mínimo. El stock se modifica mediante movimientos, no editando el número directamente.
 - Al modificar el precio, los movimientos anteriores conservan el precio unitario que tenían al registrarse. La valorización del inventario usa el precio actual.
-- La ficha muestra movimientos recientes (hasta 15). El dashboard también limita los mostrados. No confundir el límite visual con el total almacenado.
+- La ficha muestra los cinco movimientos más recientes de todo el historial. Su botón abre una pantalla dedicada para buscar y elegir fechas. Inicio y Dashboard también tienen acceso al historial, paginado de 50 en 50.
 - La app no identifica al trabajador que hizo cada movimiento y no impide editar/eliminar datos por rol. Para un piloto, el encargado debe definir quién puede operar el teléfono.
+
+## Consultar un período y el historial
+
+1. En Dashboard revisar **Período de movimientos**. Al iniciar la app se elige el mes actual; antes de v1.4.0 los indicadores acumulaban todo el historial.
+2. Tocar Hoy, 7 días, 30 días, Mes, Año o Todo. Para otro intervalo, tocar **Elegir fechas**, seleccionar Desde/Hasta en el calendario y **Aplicar período**. Cancelar conserva el filtro anterior.
+3. Comprobar las fechas escritas. Se incluyen ambos días completos y se usa la hora local del teléfono. Un rango sin operaciones muestra cero entradas/salidas; no implica que la bodega esté vacía.
+4. Volver a Inicio: sus entradas y salidas usan las mismas fechas. El stock, alertas y valorización actual no cambian por elegir otro período; no representan stock histórico.
+5. Abrir **Historial** desde Inicio/Dashboard o desde la ficha. Buscar por nombre, GTIN o nota, elegir tipo y cargar más páginas. Cada fila incluye fecha, hora e ID. Desde la ficha se restringe a ese producto.
+6. Para exportar, confirmar primero el período en Dashboard. El botón de exportación de Ajustes utiliza ese mismo período. Los filtros de búsqueda y tipo del historial no restringen el Excel: exporta todas las entradas y salidas de las fechas elegidas.
+
+La selección es de sesión: al reiniciar el proceso vuelve al mes actual. Las salidas son violetas; no indican pérdidas. Rojo identifica errores, eliminación y stock agotado.
 
 ## 8. Equivocaciones y diferencias de conteo
 
@@ -87,7 +98,7 @@ No usar **Eliminar producto** para corregir cantidades: elimina también su hist
 4. En el diálogo del teléfono, elegir guardar o compartir. Abrir el archivo guardado y verificar que se pueda leer: cerrar el diálogo no garantiza que se haya conservado una copia fuera de la app.
 5. Guardar el reporte con fecha en el lugar acordado por la empresa y registrar quién lo revisó. El archivo temporal que genera la app está en caché y no es archivo permanente.
 
-El libro incluye resumen ejecutivo, inventario y hasta los **últimos 2.000 movimientos**. El resumen considera todo el historial: puede no coincidir con los totales de la hoja de movimientos cuando haya más de 2.000. Las sumas de entradas y salidas representan actividad, no utilidad ni saldo neto; el saldo se consulta en inventario.
+El libro tiene cinco hojas: Resumen, Inventario_actual, Por_producto, Por_dia_producto y Movimientos. Las operaciones se limitan al período compartido visible en Dashboard; el stock es siempre el actual. Se incluyen todas las operaciones del rango hasta 20.000. Si hay más, la app solicita acotar fechas, sin exportar un detalle incompleto. Las sumas de entradas y salidas representan actividad, no utilidad ni saldo neto; el saldo se consulta en inventario.
 
 El reporte no contiene una restauración de SQLite ni puede importarse para recuperar el teléfono. No incluye impuestos, facturas, costos históricos completos ni cálculo de utilidades. No presentarlo como sistema contable.
 

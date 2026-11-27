@@ -33,7 +33,13 @@ Registrar pasa/falla, resultado observado y evidencia. No marcar como hecho sin 
 | P12 | Cámara a segundo plano y volver | Cámara suspendida fuera de primer plano y recuperada al volver | Pendiente |
 | P13 | Buscar y cambiar filtros rápidamente | Última búsqueda gobierna resultados; vacío explicado | Pendiente |
 | P14 | Cambiar tema y aumentar letra | Controles usables, sin información importante cortada | Pendiente |
-| P15 | Exportar y abrir Excel | Tres hojas, ceros iniciales y montos correctos | Pendiente |
+| P15 | Exportar y abrir Excel | Cinco hojas, ceros iniciales y montos correctos | Pendiente |
+| P16 | Dashboard: Hoy, Mes y rango del calendario; volver a Inicio | Fechas visibles y mismos flujos en ambas pantallas; stock actual sin cambiar | Pendiente |
+| P17 | Elegir un rango sin operaciones | Flujos en cero e historial vacío, con existencias actuales conservadas | Pendiente |
+| P18 | Abrir calendario, cambiar fechas y cancelar | El período aplicado sigue igual; rango invertido no puede aplicarse | Pendiente |
+| P19 | Historial: buscar código/nota, filtrar tipo y cargar más | Fechas completas, ID, sin duplicados al paginar y vuelta correcta a ficha | Pendiente |
+| P20 | Exportar el mismo rango desde Dashboard y Ajustes | Cinco hojas con las mismas fechas, totales por producto/día y filas que concuerdan con resumen | Pendiente |
+| P21 | Cambiar a oscuro/alto contraste y revisar entradas/salidas | Salidas violetas legibles; rojo reservado a errores/estados críticos | Pendiente |
 
 Si el código ya existe, usar otro envase o una base de prueba para P06. No borrar inventario real para reproducir casos.
 

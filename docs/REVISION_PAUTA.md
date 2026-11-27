@@ -50,6 +50,8 @@ La revisión no envía correo, no firma por el equipo ni atribuye pruebas físic
 
 ## Verificación técnica de esta revisión
 
+La versión 1.4.0 agrega salidas violetas, período compartido con calendario, historial con búsqueda/paginación y cinco hojas Excel con datos diarios y por producto. El stock actual se mantiene separado del flujo por fechas. La nueva suite tiene 20 pruebas, incluidas fronteras de fecha, paginación estable y lectura del Excel generado. Los casos P16–P21 del protocolo físico siguen pendientes; no se atribuye validación nativa por el resultado de pruebas Node.
+
 La documentación operativa se amplió con [manual de usuario](MANUAL_USUARIO.md) y [operación para empresas](OPERACION_EMPRESA.md). Se distingue el piloto actual de una puesta en producción, se documenta la base local y se conserva como pendiente el respaldo/restauración. Se sustituyó el `SafeAreaView` obsoleto y se declararon solo Android/iOS como plataformas de la app.
 
 En Windows con Node 24.20.0: TypeScript sin errores, 14 pruebas aprobadas y exportación de bundles JavaScript Android/iOS correcta. `expo install --check` no detectó desajustes tanto con el catálogo local como con el catálogo en línea. Se añadió CI para repetir instalación, tipos, pruebas, compatibilidad y exportación en GitHub. La primera corrida remota detectó versiones más recientes que el catálogo local; se actualizaron las dependencias y se volvió a verificar. La creación de un APK y ejecución física siguen pendientes.

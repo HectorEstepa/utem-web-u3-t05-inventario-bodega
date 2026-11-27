@@ -39,9 +39,11 @@ const LOTES_RAPIDOS = [1, 5, 10, 24] as const;
  */
 export function PantallaProducto({
   codigo,
+  onHistorial,
   onVolver,
 }: {
   codigo: string;
+  onHistorial: () => void;
   onVolver: () => void;
 }) {
   const db = useSQLiteContext();
@@ -70,7 +72,7 @@ export function PantallaProducto({
         setEditNombre(p.nombre);
         setEditPrecio(String(p.precio ?? 0));
         setEditMinimo(String(p.minimo));
-        setMovs(await historial(db, codigo, 15));
+        setMovs(await historial(db, codigo, 5));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo leer el producto.');
@@ -458,7 +460,7 @@ export function PantallaProducto({
                 <Boton
                   titulo={`− Salida (${cantNum || 0})`}
                   onPress={() => mover('OUT')}
-                  estilo="peligro"
+                  estilo="salida"
                   deshabilitado={ocupado || producto.stock === 0}
                   ancho="48.5%"
                 />
@@ -484,7 +486,7 @@ export function PantallaProducto({
               ]}
             >
               <Text style={[s.rotulo, { color: paleta.textoSecundario }]}>
-                HISTORIAL AUDITABLE DEL ARTÍCULO ({movs.length})
+                ÚLTIMOS {movs.length} MOVIMIENTOS · TODO EL HISTORIAL
               </Text>
               {movs.length === 0 ? (
                 <Text style={[s.vacioTxt, { color: paleta.textoTerciario }]}>
@@ -509,7 +511,7 @@ export function PantallaProducto({
                         <Text
                           style={[
                             s.movTipo,
-                            { color: esEntrada ? paleta.verde : paleta.rojo },
+                            { color: esEntrada ? paleta.verde : paleta.salida },
                           ]}
                         >
                           {esEntrada ? '▲ Entrada' : '▼ Salida'} · {esEntrada ? '+' : '−'}
@@ -520,6 +522,7 @@ export function PantallaProducto({
                           {new Date(m.fecha).toLocaleString('es-CL', {
                             day: '2-digit',
                             month: '2-digit',
+                            year: 'numeric',
                             hour: '2-digit',
                             minute: '2-digit',
                           })}
@@ -532,6 +535,7 @@ export function PantallaProducto({
                   );
                 })
               )}
+              <Boton titulo="Ver historial completo y elegir fechas" estilo="secundario" onPress={onHistorial} />
             </View>
           </Pressable>
         </ScrollView>

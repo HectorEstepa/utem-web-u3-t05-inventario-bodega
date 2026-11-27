@@ -17,6 +17,7 @@ import { SelectorSegmentado } from '../components/SelectorSegmentado';
 import { sembrarCatalogoDemo, vaciarBodega } from '../db/inventario';
 import { VERSION_ESQUEMA } from '../db/schema';
 import { exportarReporteExcel } from '../lib/exportarExcel';
+import { usePeriodo } from '../periodo';
 import { useTema, VERSION_APP, type PreferenciaTema } from '../theme';
 
 /**
@@ -35,6 +36,7 @@ export function PantallaAjustes({
   arranqueMs: number | null;
 }) {
   const db = useSQLiteContext();
+  const { periodo } = usePeriodo();
   const { paleta, preferencia, altoContraste, cambiarPreferencia, alternarAltoContraste } =
     useTema();
   const [permiso, pedirPermiso] = useCameraPermissions();
@@ -46,8 +48,8 @@ export function PantallaAjustes({
     setOcupado(true);
     setMensaje(null);
     try {
-      const archivo = await exportarReporteExcel(db);
-      setMensaje(`Reporte gerencial exportado: ${archivo}`);
+      const archivo = await exportarReporteExcel(db, periodo);
+      setMensaje(`Reporte generado: ${archivo}. Comprueba que lo guardaste desde el menú del teléfono.`);
     } catch (e) {
       setMensaje(e instanceof Error ? e.message : 'Error al exportar Excel.');
     } finally {
@@ -235,7 +237,7 @@ export function PantallaAjustes({
               ⤓ Exportar inventario y movimientos (.xlsx)
             </Text>
             <Text style={[s.filaSub, { color: paleta.textoSecundario }]}>
-              Libro Excel con 3 hojas: Resumen Ejecutivo, Inventario y Movimientos
+              5 hojas · {periodo.etiqueta}: {periodo.detalle}
             </Text>
           </View>
           <Text style={[s.chevron, { color: paleta.textoTerciario }]}>›</Text>

@@ -126,17 +126,41 @@ El catálogo demo agrega cinco artículos **ficticios**, con códigos de dígito
 | Stock bajo | `src/lib/stock.ts`, ficha y listado: estado derivado, texto, símbolo y color |
 | Medición propia | `src/bench/medicion.ts` y diagnóstico; **resultados físicos pendientes** |
 
-También hay búsqueda, filtros, historial, edición, temas visuales, dashboard y exportación Excel de tres hojas. No hay servidor, cuentas ni sincronización entre teléfonos.
+También hay búsqueda, filtros, historial, edición, temas visuales, dashboard y exportación Excel de cinco hojas por período. No hay servidor, cuentas ni sincronización entre teléfonos.
 
 ## Decisiones y límites
 
 - **SQLite para inventario:** transacciones entre productos y movimientos y consultas por clave primaria. AsyncStorage guarda preferencias; M1 lo compara como arreglo JSON sin caché propia, no como todas las arquitecturas posibles con AsyncStorage.
 - **Saldo y bitácora juntos:** se evita confirmar un saldo sin su movimiento. El estado de stock se deriva del saldo y el mínimo, sin guardar otra columna que pueda desactualizarse.
 - **Montos enteros CLP:** el precio de cada movimiento se congela al registrarlo. Editar un precio no cambia movimientos anteriores.
-- **Limitaciones:** sin respaldo automático, usuarios, facturación ni sincronización. Eliminar un producto elimina también su historial, previa confirmación; no es una bitácora contable inmutable. Excel incluye como máximo los últimos 2.000 movimientos y el resumen incluye todo el historial. No es un respaldo restaurable de la base.
+- **Limitaciones:** sin respaldo automático, usuarios, facturación ni sincronización. Eliminar un producto elimina también su historial, previa confirmación; no es una bitácora contable inmutable. Excel exporta todos los movimientos del período elegido hasta 20.000; si se supera ese límite solicita acotar fechas, sin truncar filas. El historial se consulta por páginas de 50. No es un respaldo restaurable de la base.
 - **Validación:** el bundle JS y las pruebas de escritorio no prueban cámara ni puente nativo de SQLite. Android e iOS necesitan validación física.
 
 El catálogo demo anterior podía contener `7801610001625` y `7802900001015`, cuyos verificadores son incorrectos. Los nuevos ejemplos usan `7801610001622` y `7802900001018`. No se renombran registros existentes automáticamente: exporta y revisa tus datos antes de eliminar ejemplos antiguos.
+
+## Períodos, historial y reportes
+
+La versión 1.4.0 abre con **Este mes**. Antes de esta versión, las entradas y salidas eran acumulados de todo el historial. Ahora Dashboard permite elegir **Hoy, 7 días, 30 días, Mes, Año, Todo o Elegir fechas**, con calendario nativo para inicio y fin. El rango aparece escrito en pantalla; ambos extremos incluyen días completos en la zona horaria del teléfono.
+
+El mismo filtro de sesión se comparte entre Inicio, Dashboard, historial y exportaciones de Ajustes. Inicio muestra el período y lleva al Dashboard para cambiarlo. Al reiniciar el proceso se vuelve al mes actual. Los presets se recalculan al cambiar de día o volver a primer plano. **Stock, valorización actual, críticos y top de existencias siempre representan el estado actual**; no se reconstruye el stock de una fecha pasada.
+
+Las entradas se identifican en verde y las salidas en violeta, sin significado de ganancia/pérdida. El rojo se reserva para errores, acciones destructivas y stock agotado. Los montos son unidades por precio registrado, no utilidades ni ventas cobradas.
+
+**Historial** tiene acceso desde Inicio, Dashboard y la ficha. Incluye búsqueda por nombre/código/nota, filtro de tipo y período, fecha completa, ID de operación y carga de 50 en 50. La ficha conserva cinco movimientos recientes de todo el historial; su botón abre la consulta con el período compartido visible.
+
+El Excel tiene estas hojas, con período, fecha de generación y zona horaria:
+
+| Hoja | Contenido |
+| --- | --- |
+| Resumen | Entradas/salidas del período, fechas de primera/última operación y stock actual claramente separado |
+| Inventario_actual | Catálogo y existencias al generar; no es un cierre histórico |
+| Por_producto | Unidades y montos recibidos/despachados por producto en el rango |
+| Por_dia_producto | Fecha local, producto y cantidades/montos de entrada y salida de cada día |
+| Movimientos | Todas las operaciones del rango, ID, fecha y hora local, marca UTC, precio histórico y nota |
+
+El archivo incorpora el rango en su nombre. Se exporta una instantánea consistente; las cinco hojas corresponden a la misma lectura de datos. Con más de 20.000 operaciones se pide elegir un período más corto. **No es un respaldo restaurable**. Cambiar fechas no modifica existencias ni elimina movimientos.
+
+El calendario usa el componente [DateTimePicker compatible con Expo SDK 58](https://docs.expo.dev/versions/v58.0.0/sdk/date-time-picker/). Después de actualizar el código, ejecutar `npm ci` y reiniciar Metro. Una APK o compilación propia anterior debe reconstruirse para incluir esta dependencia nativa; una actualización de JavaScript por sí sola no la instala.
 
 ## Mediciones
 
@@ -157,7 +181,7 @@ npx expo install --check
 npx expo export --platform android --platform ios --output-dir dist
 ```
 
-Las 14 pruebas cubren GTIN, CLP, stock y SQLite real de Node: persistencia en disco, migración v1→v2, rollback, duplicados y datos inválidos. El adaptador no ejecuta Expo ni simula un teléfono. GitHub Actions repite estas verificaciones en push y pull request.
+Las 20 pruebas cubren GTIN, CLP, stock y SQLite real de Node: persistencia en disco, migración v1→v2, rollback, duplicados y datos inválidos. El adaptador no ejecuta Expo ni simula un teléfono. GitHub Actions repite estas verificaciones en push y pull request.
 
 ## APK para prueba física
 

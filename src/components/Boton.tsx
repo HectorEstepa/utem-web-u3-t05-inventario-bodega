@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, type ViewStyle } from 'react-native';
 import { TOQUE_MINIMO, useTema } from '../theme';
 
-type Estilo = 'primario' | 'secundario' | 'peligro' | 'exito' | 'fantasma';
+type Estilo = 'primario' | 'secundario' | 'peligro' | 'exito' | 'salida' | 'fantasma';
 
 export function Boton({
   titulo,
@@ -26,6 +26,7 @@ export function Boton({
     secundario: paleta.superficieElevada,
     peligro: paleta.rojo,
     exito: paleta.verde,
+    salida: paleta.salida,
     fantasma: 'transparent',
   };
 
@@ -34,6 +35,7 @@ export function Boton({
     secundario: paleta.acento,
     peligro: '#FFFFFF',
     exito: '#FFFFFF',
+    salida: paleta.oscura ? '#22123D' : '#FFFFFF',
     fantasma: paleta.acento,
   };
 
